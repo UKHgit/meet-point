@@ -170,25 +170,16 @@ class ChatApp {
             type: 'message',
             text: text,
             room: this.currentRoom,
-            username: this.username
+            username: this.username,
+            timestamp: new Date().toISOString()
         };
 
         try {
             if (this.socket) {
                 this.socket.send(JSON.stringify(message));
             } else {
-                // Use HTTP POST for SSE
-                const response = await fetch('/api/message', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(message)
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Failed to send message');
-                }
+                // Add message locally (simulate real-time)
+                this.addMessage(message);
             }
             
             this.elements.messageInput.value = '';
