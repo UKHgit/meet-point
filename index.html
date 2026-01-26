@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Realtime Chat</h1>
+            <div class="room-info">
+                <span id="roomName">General</span>
+                <span id="userCount">0 users</span>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="sidebar">
+                <div class="room-section">
+                    <h3>Rooms</h3>
+                    <div class="room-list">
+                        <div class="room-item active" data-room="general">General</div>
+                    </div>
+                    <div class="create-room">
+                        <input type="text" id="newRoomName" placeholder="New room name...">
+                        <button id="createRoomBtn">Create</button>
+                    </div>
+                </div>
+                
+                <div class="user-section">
+                    <h3>You</h3>
+                    <div class="user-info">
+                        <input type="text" id="username" placeholder="Enter your name..." value="Anonymous">
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-container">
+                <div class="messages" id="messages"></div>
+                <div class="input-area">
+                    <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+                    <button id="sendBtn">Send</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

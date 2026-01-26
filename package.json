@@ -1,0 +1,31 @@
+{
+  "name": "realtime-chat",
+  "version": "1.0.0",
+  "description": "A real-time chat application with no database required - Vercel compatible",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "build": "echo 'No build step required'",
+    "vercel-build": "echo 'Ready for Vercel deployment'"
+  },
+  "keywords": [
+    "chat",
+    "websocket",
+    "realtime",
+    "nodejs",
+    "vercel",
+    "serverless"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.0"
+  }
+}
