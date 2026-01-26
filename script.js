@@ -75,9 +75,9 @@ class ChatApp {
     }
 
     connect() {
-        // Check if we're on Vercel (no WebSocket support on free tier)
-        if (window.location.hostname.includes('vercel.app') || window.location.hostname.includes('vercel.com')) {
-            this.connectSSE();
+        // Check if we're on Netlify (no WebSocket support on free tier)
+        if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('netlify.com')) {
+            this.connectNetlify();
         } else {
             this.connectWebSocket();
         }
@@ -121,22 +121,18 @@ class ChatApp {
         };
     }
 
-    connectSSE() {
-        // For now, simulate connection since we simplified the API
+    connectNetlify() {
+        // Connect to Netlify Functions
         this.isConnected = true;
-        this.addSystemMessage('Connected to chat server (Vercel mode)');
+        this.addSystemMessage('Connected to chat server (Netlify mode)');
         this.elements.sendBtn.disabled = false;
         
-        // Test connection
-        fetch('/api/sse')
-            .then(response => response.json())
-            .then(data => {
-                console.log('API test:', data);
-            })
-            .catch(error => {
-                console.error('API test failed:', error);
-                this.addSystemMessage('API connection test failed');
-            });
+        // Load initial data
+        this.loadRoomList();
+        this.loadMessages();
+        
+        // Start polling for new messages
+        this.startPolling();
     }
 
     handleMessage(data) {
@@ -170,16 +166,32 @@ class ChatApp {
             type: 'message',
             text: text,
             room: this.currentRoom,
-            username: this.username,
-            timestamp: new Date().toISOString()
+            username: this.username
         };
 
         try {
             if (this.socket) {
                 this.socket.send(JSON.stringify(message));
             } else {
-                // Add message locally (simulate real-time)
-                this.addMessage(message);
+                // Use Netlify Functions
+                const response = await fetch('/.netlify/functions/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(message)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to send message');
+                }
+                
+                // Add message locally for instant feedback
+                this.addMessage({
+                    ...message,
+                    timestamp: new Date().toISOString(),
+                    id: Math.random().toString(36).substr(2, 9)
+                });
             }
             
             this.elements.messageInput.value = '';
@@ -256,13 +268,16 @@ class ChatApp {
                     room: roomName
                 }));
             } else {
-                // Use HTTP POST for SSE
-                const response = await fetch('/api/room', {
+                // Use Netlify Functions
+                const response = await fetch('/.netlify/functions/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ room: roomName })
+                    body: JSON.stringify({
+                        type: 'createRoom',
+                        room: roomName
+                    })
                 });
                 
                 if (!response.ok) {
@@ -270,6 +285,10 @@ class ChatApp {
                     this.addSystemMessage(error.error || 'Failed to create room');
                     return;
                 }
+                
+                // Refresh room list
+                this.loadRoomList();
+                this.addSystemMessage(`Room '${roomName}' created successfully`);
             }
             
             this.elements.newRoomName.value = '';
@@ -332,29 +351,50 @@ class ChatApp {
         this.elements.userCount.textContent = `${count} user${count !== 1 ? 's' : ''}`;
     }
 
-    async sendSystemMessage(text) {
+    async loadRoomList() {
         try {
-            const message = {
-                type: 'system',
-                text: text,
-                room: this.currentRoom,
-                username: 'System'
-            };
-            
-            const response = await fetch('/api/message', {
+            const response = await fetch('/.netlify/functions/chat');
+            const data = await response.json();
+            if (data.rooms) {
+                this.updateRoomList(data.rooms);
+            }
+        } catch (error) {
+            console.error('Error loading room list:', error);
+        }
+    }
+
+    async loadMessages() {
+        try {
+            const response = await fetch('/.netlify/functions/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(message)
+                body: JSON.stringify({
+                    type: 'getMessages',
+                    room: this.currentRoom
+                })
             });
-            
-            if (!response.ok) {
-                throw new Error('Failed to send system message');
+            const data = await response.json();
+            if (data.messages) {
+                this.clearMessages();
+                data.messages.forEach(msg => this.addMessage(msg));
+            }
+            if (data.users !== undefined) {
+                this.updateUserCount(data.users);
             }
         } catch (error) {
-            console.error('Error sending system message:', error);
+            console.error('Error loading messages:', error);
         }
+    }
+
+    startPolling() {
+        // Poll for new messages every 3 seconds
+        setInterval(() => {
+            if (this.isConnected && !this.socket) {
+                this.loadMessages();
+            }
+        }, 3000);
     }
 }
 
