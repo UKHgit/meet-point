@@ -121,11 +121,14 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    /* Fallback */
     height: 100dvh;
-    /* Mobile viewport fix */
+    /* Modern mobile viewport fix */
+    max-height: 100vh;
+    max-height: 100dvh;
     max-width: 1600px;
     margin: 0 auto;
+    overflow: hidden;
+    /* Prevent container-level scroll */
 }
 
 /* Desktop Header */
@@ -1037,6 +1040,7 @@ body {
     position: relative;
     z-index: 1000;
     flex-shrink: 0;
+    /* Already added in late styles, but keeping consistent here */
 }
 
 .mobile-title {
@@ -1108,6 +1112,9 @@ body {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        height: 60px;
+        /* Explicit height for stability */
+        flex-shrink: 0;
     }
 
     .sidebar {
@@ -1138,11 +1145,11 @@ body {
 
     .messages {
         padding: 1rem;
-        padding-bottom: 80px;
-        /* Ensure space for input area */
+        flex: 1 1 0%;
+        min-height: 0;
+        /* Critical for flex scrolling */
         overflow-y: auto;
         overscroll-behavior-y: contain;
-        /* Prevent pull-to-refresh on chat list */
         -webkit-overflow-scrolling: touch;
     }
 
@@ -1399,28 +1406,30 @@ textarea:focus-visible {
 /* Layout Fixes for Mobile & Flexbox */
 .chat-container {
     display: flex;
-    /* Force flex */
     flex-direction: column;
     overflow: hidden;
     flex: 1;
-    /* Grow to fill space */
+    height: 0;
+    /* Important for flex-grow to work without popping out */
 }
 
 .messages {
     flex: 1;
-    /* Take all available space */
     overflow-y: auto;
-    /* Scroll internally */
-    min-height: 0;
-    /* Fix flex overflow */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
     padding-bottom: 20px;
 }
 
 .input-area {
     flex-shrink: 0;
-    /* Never shrink input area */
     position: relative;
     z-index: 10;
+    background: var(--bg-dark);
+}
+
+.mobile-header {
+    flex-shrink: 0;
 }
 
 /* Ensure main takes full height in column layout */
@@ -1434,11 +1443,12 @@ textarea:focus-visible {
 @media (max-width: 768px) {
     .chat-container {
         height: auto !important;
-        /* Let flex handle it, override any fixed calcs */
         flex: 1;
+        overflow: hidden;
     }
 
     .messages {
         padding-bottom: 20px;
+        flex: 1;
     }
 }
