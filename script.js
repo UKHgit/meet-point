@@ -786,6 +786,37 @@ connect() {
 
     showSuccess(message) {
         console.log('Success:', message);
+        this.showDebugInfo('Success: ' + message);
+    }
+
+    showDebugInfo(info) {
+        if (this.elements.debugInfo) {
+            this.elements.debugInfo.innerHTML = '<h4>Debug Info</h4>' + info;
+            this.elements.debugInfo.style.display = 'block';
+        }
+    }
+
+    testSend() {
+        console.log('Test: Send button clicked');
+        if (this.elements.sendBtn) {
+            this.elements.sendBtn.click();
+        }
+    }
+
+    testJoin() {
+        console.log('Test: Join button clicked');
+        if (this.elements.joinRoomBtn && this.elements.roomNameInput) {
+            this.elements.roomNameInput.value = 'test-room';
+            this.elements.joinRoomBtn.click();
+        }
+    }
+
+    testChangeName() {
+        console.log('Test: Change name button clicked');
+        if (this.elements.changeNameBtn && this.elements.username) {
+            this.elements.username.value = 'TestUser';
+            this.elements.changeNameBtn.click();
+        }
     }
 
     getApiEndpoint() {
