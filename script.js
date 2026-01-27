@@ -1,10 +1,9 @@
 /**
- * Realtime Chat - hack.chat style
- * Uses hack.chat's public WebSocket server for real-time messaging
- * Room name in URL for easy sharing
+ * Realtime Chat
+ * P2P History Sync & Mobile Optimization
  */
 
-// hack.chat WebSocket server
+// WebSocket server
 const WS_URL = 'wss://hack.chat/chat-ws';
 
 class RealtimeChat {
@@ -14,11 +13,15 @@ class RealtimeChat {
         this.currentRoom = null;
         this.replyingTo = null;
         this.users = [];
+        this.messagesHistory = []; // Store messages for P2P sync
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
         this.pingInterval = null;
+
+        // Mention state
         this.isMentionListVisible = false;
         this.selectedMentionIndex = 0;
+        this.mentionTriggerIndex = -1;
 
         this.initializeElements();
         this.bindEvents();
@@ -215,7 +218,7 @@ class RealtimeChat {
             return;
         }
 
-        // Sanitize room name (hack.chat style - prefix with ? is optional)
+        // Sanitize room name
         room = room.replace(/^\?/, '');
 
         // Close existing connection
@@ -228,6 +231,7 @@ class RealtimeChat {
 
         this.currentRoom = room;
         this.users = [];
+        this.messagesHistory = []; // Clear history on room switch
         this.reconnectAttempts = 0;
 
         // Update UI
@@ -256,7 +260,7 @@ class RealtimeChat {
         this.updateStatus('Connecting...', 'connecting');
         this.addSystemMessage(`Joining room "${room}"...`);
 
-        // Connect to hack.chat WebSocket
+        // Connect
         this.connect();
     }
 
@@ -265,10 +269,10 @@ class RealtimeChat {
             this.ws = new WebSocket(WS_URL);
 
             this.ws.onopen = () => {
-                console.log('WebSocket connected');
+                console.log('Connected');
                 this.reconnectAttempts = 0;
 
-                // Join room (hack.chat protocol)
+                // Join room
                 this.ws.send(JSON.stringify({
                     cmd: 'join',
                     channel: this.currentRoom,
@@ -276,6 +280,12 @@ class RealtimeChat {
                 }));
 
                 this.startPing();
+
+                // Request history from other peers
+                // Delay slightly to ensure join is processed
+                setTimeout(() => {
+                    this.requestHistory();
+                }, 1000);
             };
 
             this.ws.onmessage = (event) => {
@@ -288,7 +298,7 @@ class RealtimeChat {
             };
 
             this.ws.onclose = () => {
-                console.log('WebSocket closed');
+                console.log('Closed');
                 this.updateStatus('Disconnected', 'error');
                 this.stopPing();
 
@@ -305,7 +315,7 @@ class RealtimeChat {
             };
 
             this.ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
+                console.error('Error:', error);
                 this.updateStatus('Connection error', 'error');
             };
 
@@ -320,11 +330,6 @@ class RealtimeChat {
         this.stopPing();
         this.pingInterval = setInterval(() => {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                // Determine if we need to send a ping. Hack.chat uses ping cmd?
-                // Actually hack.chat sends pings to us, but we can send one back or just empty.
-                // Standard approach for hack.chat is just keeping connection open.
-                // We'll send a benign packet if needed, or rely on browser ping.
-                // Let's send a ping command just in case.
                 this.ws.send(JSON.stringify({ cmd: 'ping' }));
             }
         }, 60000); // 60s
@@ -337,10 +342,64 @@ class RealtimeChat {
         }
     }
 
+    // P2P History Sync Methods
+    requestHistory() {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+        // Send hidden command
+        this.ws.send(JSON.stringify({
+            cmd: 'chat',
+            text: '__REQ_HIST__'
+        }));
+    }
+
+    shareHistory() {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+        if (this.messagesHistory.length === 0) return;
+
+        // Share last 20 messages
+        const relevantHistory = this.messagesHistory.slice(-20);
+        const historyData = JSON.stringify(relevantHistory);
+
+        this.ws.send(JSON.stringify({
+            cmd: 'chat',
+            text: '__HIST_DATA__:' + historyData
+        }));
+    }
+
+    loadHistory(jsonString) {
+        try {
+            const history = JSON.parse(jsonString);
+            if (!Array.isArray(history)) return;
+
+            // Filter duplicates roughly
+            // Just assume if we have very initially messages, we prepend these.
+            // Since we only request on load, we likely have 0 messages or just system messages.
+
+            let addedCount = 0;
+            const existingContent = this.messagesHistory.map(m => m.text + m.timestamp);
+
+            history.forEach(msg => {
+                // Check if we already have this message (simple heuristic)
+                if (!existingContent.includes(msg.text + msg.timestamp)) {
+                    // Add to UI
+                    this.addMessage(msg, msg.username === this.username, true); // true = isHistory
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                this.addSystemMessage(`Restored ${addedCount} messages from peer history.`);
+            }
+
+        } catch (e) {
+            console.error('Failed to load history', e);
+        }
+    }
+
     handleMessage(data) {
         switch (data.cmd) {
             case 'onlineSet':
-                // Initial user list when joining
                 this.users = [...new Set(data.nicks || [])];
                 this.updateUserList();
                 this.updateStatus('Connected', 'connected');
@@ -349,26 +408,43 @@ class RealtimeChat {
                 break;
 
             case 'onlineAdd':
-                // User joined
                 if (data.nick) {
                     if (!this.users.includes(data.nick)) {
                         this.users.push(data.nick);
                         this.updateUserList();
-                        this.addSystemMessage(`${data.nick} joined the room`);
+                        this.addSystemMessage(`${data.nick} joined`);
+
+                        // If new user joins, maybe share history?
+                        // But protocol is PUBLIC. If everyone sends history, it's a mess.
+                        // Better to wait for them to REQUEST it via __REQ_HIST__
                     }
                 }
                 break;
 
             case 'onlineRemove':
-                // User left
                 if (data.nick) {
                     this.users = this.users.filter(u => u !== data.nick);
                     this.updateUserList();
-                    this.addSystemMessage(`${data.nick} left the room`);
+                    this.addSystemMessage(`${data.nick} left`);
                 }
                 break;
 
             case 'chat':
+                // Check for hidden commands
+                if (data.text === '__REQ_HIST__') {
+                    // Start history sync logic
+                    // Only reply if I have history and random chance to avoid storm
+                    if (this.messagesHistory.length > 5) {
+                        setTimeout(() => this.shareHistory(), Math.random() * 2000 + 500);
+                    }
+                    return; // Don't show
+                }
+
+                if (data.text.startsWith('__HIST_DATA__:')) {
+                    this.loadHistory(data.text.substring(14));
+                    return; // Don't show
+                }
+
                 // Chat message
                 this.addMessage({
                     username: data.nick || 'Anonymous',
@@ -379,17 +455,14 @@ class RealtimeChat {
                 break;
 
             case 'info':
-                // Info message from server
                 this.addSystemMessage(data.text || 'Info');
                 break;
 
             case 'warn':
-                // Warning from server
                 this.addSystemMessage('⚠️ ' + (data.text || 'Warning'));
                 break;
 
             case 'emote':
-                // Emote/action
                 this.addSystemMessage(`* ${data.nick} ${data.text}`);
                 break;
 
@@ -408,7 +481,6 @@ class RealtimeChat {
 
         if (lastAtPos !== -1) {
             const query = textBeforeCursor.substring(lastAtPos + 1);
-            // Check if there are spaces, which means we aren't filtering a username anymore
             if (!query.includes(' ')) {
                 this.showMentions(query, lastAtPos);
                 return;
@@ -421,7 +493,6 @@ class RealtimeChat {
     showMentions(query, atIndex) {
         if (!this.elements.mentionSuggestions) return;
 
-        // Filter users who match query (exclude self)
         const matches = this.users.filter(u =>
             u.toLowerCase().startsWith(query.toLowerCase()) &&
             u !== this.username
@@ -441,15 +512,10 @@ class RealtimeChat {
 
         this.elements.mentionSuggestions.style.display = 'block';
 
-        // Position popup above the cursor (simplified positioning)
-        // Ideally should measure text width, but fixed left is okay for now
-        // or position relative to input area
-
         this.isMentionListVisible = true;
         this.selectedMentionIndex = 0;
         this.mentionTriggerIndex = atIndex;
 
-        // Add click listeners to items
         const items = this.elements.mentionSuggestions.querySelectorAll('.mention-suggestion');
         items.forEach(item => {
             item.addEventListener('click', () => {
@@ -505,8 +571,7 @@ class RealtimeChat {
             input.value = `${before}@${username} ${after}`;
             input.focus();
 
-            // Move cursor after the mention
-            const newCursorPos = this.mentionTriggerIndex + username.length + 2; // @ + name + space
+            const newCursorPos = this.mentionTriggerIndex + username.length + 2;
             input.setSelectionRange(newCursorPos, newCursorPos);
 
             this.hideMentions();
@@ -553,51 +618,70 @@ class RealtimeChat {
             return;
         }
 
-        // Send message (hack.chat protocol)
+        let finalMessage = text;
+
+        if (this.replyingTo) {
+            const quote = `> @${this.replyingTo.username}: ${this.replyingTo.text.substring(0, 50)}${this.replyingTo.text.length > 50 ? '...' : ''}\n`;
+            finalMessage = quote + text;
+        }
+
         this.ws.send(JSON.stringify({
             cmd: 'chat',
-            text: text
+            text: finalMessage
         }));
 
-        // Clear input
         input.value = '';
         input.style.height = 'auto';
 
-        // Clear reply
         this.replyingTo = null;
         if (this.elements.replyPreview) {
             this.elements.replyPreview.style.display = 'none';
         }
     }
 
-    addMessage(data, isSent) {
+    addMessage(data, isSent, isHistory = false) {
+        // Store for history sync (only keeping clean text and essential data)
+        // Avoid storing duplicates if already there
+        if (!isHistory) { // If it's a live message, add to local history
+            this.messagesHistory.push({
+                username: data.username,
+                text: data.text, // Store RAW text including quote info
+                timestamp: data.timestamp,
+                trip: data.trip
+            });
+            // Keep history limited to 100 messages
+            if (this.messagesHistory.length > 100) {
+                this.messagesHistory.shift();
+            }
+        }
+
         const div = document.createElement('div');
         div.className = `message ${isSent ? 'sent' : 'received'}`;
+        // Add fade-in animation
+        div.style.animation = 'fadeIn 0.3s ease-out';
 
-        // Create message content
         const content = document.createElement('div');
         content.className = 'message-content';
 
-        // Check if there is a reply quotation in the message
-        // Usually clients handle this by parsing the message text
-        // hack.chat format: > @username ...
-        // But for our click-to-reply, we just append current text.
-        // We can parse potential replies here if we want to display them nicely
-
-        // If this message IS a reply (from our client sending pattern or others)
-        // We'll trust the display, but hack.chat doesn't send "replyTo" metadata.
-        // We can check if the text starts with "> "
-
+        // Check for Reply Quote
         let messageText = data.text;
 
-        // Basic reply formatting check
-        // Not perfect but works for common clients
-        if (messageText.startsWith('>')) {
-            // It might be a reply
-            // Split by newline
-            const lines = messageText.split('\n');
-            // If first line starts with >, treat it as quote
-            // This is simple markdown-ish parsing
+        const replyRegex = /^> @([\w-]+): (.*?)(\n|$)/;
+        const match = messageText.match(replyRegex);
+
+        if (match) {
+            const replyUser = match[1];
+            const replyText = match[2];
+
+            messageText = messageText.substring(match[0].length);
+
+            const replyDiv = document.createElement('div');
+            replyDiv.className = 'message-reply';
+            replyDiv.innerHTML = `
+                <div class="reply-tag">${this.escapeHtml(replyUser)}</div>
+                <div class="reply-text">${this.escapeHtml(replyText)}</div>
+            `;
+            content.appendChild(replyDiv);
         }
 
         const header = document.createElement('div');
@@ -617,12 +701,8 @@ class RealtimeChat {
         const text = document.createElement('div');
         text.className = 'message-text';
 
-        // Check for mentions and highlight them
-        // Simple replace for @username
-        // We need to be careful not to break HTML escaping
-        const escapedText = this.escapeHtml(data.text);
-        text.innerHTML = escapedText.replace(/@([a-zA-Z0-9_]+)/g, (match, name) => {
-            // Highlight if it's me
+        const escapedText = this.escapeHtml(messageText);
+        text.innerHTML = escapedText.replace(/@([\w-]+)/g, (match, name) => {
             if (name === this.username) {
                 return `<span class="mention-highlight me">${match}</span>`;
             }
@@ -636,9 +716,6 @@ class RealtimeChat {
             content.appendChild(header);
         }
 
-        // WhatsApp style reply block insertion could go here if we parsed it
-        // For now, we rely on click-to-reply quoting
-
         content.appendChild(text);
 
         if (isSent) {
@@ -650,26 +727,40 @@ class RealtimeChat {
 
         div.appendChild(content);
 
-        // Click to reply
         div.onclick = (e) => {
-            // Only trigger if not selecting text
             const selection = window.getSelection();
             if (selection.toString().length === 0) {
-                this.replyToMessage(data);
+                this.replyToMessage({
+                    username: data.username,
+                    text: messageText,
+                    timestamp: data.timestamp
+                });
             }
         };
 
         if (this.elements.messages) {
+            // Insertion logic: history should be prepended or sorted?
+            // Simple logic: If live, append. If history check sort?
+            // Since we assume history is older, we could prepend, but user asked to "see early messages"
+            // Usually we just append them but they will appear at bottom.
+            // P2P restore is async. If we prepend, it might look weird if we already have messages.
+            // Better: Auto-scroll behavior.
+
             this.elements.messages.appendChild(div);
-            // Only scroll if we were near bottom
-            const isNearBottom = this.elements.messages.scrollHeight - this.elements.messages.scrollTop - this.elements.messages.clientHeight < 100;
-            if (isNearBottom) {
+
+            // Smoother scroll logic for mobile
+            if (!isHistory) {
+                requestAnimationFrame(() => {
+                    this.scrollToBottom();
+                });
+            } else {
+                // For history load, maybe scroll to bottom once at end?
+                // But we do it per message here.
                 this.scrollToBottom();
             }
         }
     }
 
-    // ... rest of methods ... same as before
     addSystemMessage(text) {
         const div = document.createElement('div');
         div.className = 'system-message';
@@ -689,7 +780,10 @@ class RealtimeChat {
 
     scrollToBottom() {
         if (this.elements.messages) {
-            this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
+            // Force layout update for mobile keyboard accuracy
+            setTimeout(() => {
+                this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
+            }, 50); // Small delay for mobile rendering
         }
     }
 
@@ -704,61 +798,8 @@ class RealtimeChat {
         if (this.elements.replyText) {
             this.elements.replyText.textContent = message.text.substring(0, 100);
         }
-
-        // Add quote to input? Hack.chat usually does "> @name quote"
-        // But users asked for WhatsApp style.
-        // We will just focus input. The UI shows the reply context.
-        // When sending, we might want to prepend the quote if we want compatibility with other clients.
-        // WhatsApp style implies the metadata is sent, but hack.chat protocol is text-only.
-        // So we prepending Quote is the standard way.
-
         if (this.elements.messageInput) {
-            // Optional: Pre-fill input with quote pattern?
-            // this.elements.messageInput.value = `> @${message.username} ${message.text}\n`; 
-            // Users usually prefer just typing and having the context attached visually.
-            // Since we can't send "metadata" to hack.chat, we have to send text.
-            // Let's emulate WhatsApp: The "reply" UI is local. When sending, we prepend quote.
             this.elements.messageInput.focus();
-        }
-    }
-
-    // Updated send to handle reply text
-    sendMessage() {
-        const input = this.elements.messageInput;
-        if (!input) return;
-
-        const text = input.value.trim();
-        if (!text) return;
-
-        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-            this.addSystemMessage('Not connected. Please join a room first.');
-            return;
-        }
-
-        let finalMessage = text;
-
-        // If replying, format it like a quote so others see context
-        if (this.replyingTo) {
-            // standard hack.chat reply format: "> message"
-            // or "> @user: message"
-            const quote = `> @${this.replyingTo.username}: ${this.replyingTo.text.substring(0, 50)}${this.replyingTo.text.length > 50 ? '...' : ''}\n`;
-            finalMessage = quote + text;
-        }
-
-        // Send message (hack.chat protocol)
-        this.ws.send(JSON.stringify({
-            cmd: 'chat',
-            text: finalMessage
-        }));
-
-        // Clear input
-        input.value = '';
-        input.style.height = 'auto';
-
-        // Clear reply
-        this.replyingTo = null;
-        if (this.elements.replyPreview) {
-            this.elements.replyPreview.style.display = 'none';
         }
     }
 
@@ -789,7 +830,6 @@ class RealtimeChat {
                 input.value = this.username;
             }
 
-            // Rejoin room with new name
             if (this.currentRoom && this.ws && this.ws.readyState === WebSocket.OPEN) {
                 this.ws.close();
                 setTimeout(() => this.connect(), 500);
@@ -833,6 +873,6 @@ class RealtimeChat {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Starting Chat...');
+    console.log('Meet Point Initialized');
     window.chatApp = new RealtimeChat();
 });

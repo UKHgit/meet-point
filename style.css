@@ -43,6 +43,9 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    /* Fallback */
+    height: 100dvh;
+    /* Mobile viewport fix */
     max-width: 1600px;
     margin: 0 auto;
 }
@@ -58,6 +61,23 @@ body {
     justify-content: space-between;
     align-items: center;
     box-shadow: var(--shadow-glow);
+}
+
+.credits {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: -5px;
+    margin-left: 2rem;
+}
+
+.credits a {
+    color: var(--secondary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.credits a:hover {
+    text-decoration: underline;
 }
 
 .header h1 {
@@ -813,6 +833,24 @@ body {
 
     .messages {
         padding: 1rem;
+        padding-bottom: 80px;
+        /* Ensure space for input area */
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+        /* Prevent pull-to-refresh on chat list */
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .mobile-title-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .mobile-credits {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-top: -2px;
     }
 
     .message {

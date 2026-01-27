@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Real-time Chat - Private rooms with instant messaging">
     <meta name="theme-color" content="#8b5cf6">
-    <title>Realtime Chat | Private Rooms</title>
+    <title>Meet Point | Private Rooms</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
@@ -15,7 +15,10 @@
 <body>
     <div class="container">
         <header class="header">
-            <h1>Realtime Chat</h1>
+            <div>
+                <h1>Meet Point</h1>
+                <div class="credits">by <a href="https://ukh.netlify.app" target="_blank">UKH</a></div>
+            </div>
             <div class="room-info">
                 <span id="roomName">Not in room</span>
                 <span id="userCount">0 users</span>
@@ -24,7 +27,10 @@
 
         <header class="mobile-header">
             <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
-            <div class="mobile-title" id="mobileTitle">Realtime Chat</div>
+            <div class="mobile-title-container">
+                <div class="mobile-title" id="mobileTitle">Meet Point</div>
+                <div class="mobile-credits">by UKH</div>
+            </div>
             <div class="mobile-users" id="mobileUsers">0 users</div>
         </header>
 
