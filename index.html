@@ -1,72 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Realtime Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="P2P Real-time Chat - No servers, direct browser-to-browser messaging">
+    <meta name="theme-color" content="#8b5cf6">
+    <title>P2P Chat | Private Rooms</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
+    <!-- PeerJS for WebRTC P2P -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 </head>
+
 <body>
     <div class="container">
         <header class="header">
-            <h1>Realtime Chat</h1>
+            <h1>P2P Chat</h1>
             <div class="room-info">
                 <span id="roomName">Not in room</span>
                 <span id="userCount">0 users</span>
             </div>
         </header>
-        
+
         <header class="mobile-header">
-            <button class="menu-toggle" id="menuToggle">☰</button>
-            <div class="mobile-title" id="mobileTitle">Private Chat</div>
+            <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">☰</button>
+            <div class="mobile-title" id="mobileTitle">P2P Chat</div>
             <div class="mobile-users" id="mobileUsers">0 users</div>
         </header>
 
         <main class="main">
             <div class="sidebar">
                 <div class="room-section">
-                    <h3>Private Room</h3>
+                    <h3>🚀 Join a Room</h3>
                     <div class="join-room">
-                        <input type="text" id="roomNameInput" placeholder="Enter room name...">
+                        <input type="text" id="roomNameInput" placeholder="Enter room name..." autocomplete="off">
                         <button id="joinRoomBtn">Join Room</button>
                     </div>
                     <div class="current-room">
                         <span id="currentRoomDisplay">Not in room</span>
                     </div>
                 </div>
-                
+
                 <div class="online-users-section">
-                    <h3>Online Users</h3>
+                    <h3>👥 Online Users</h3>
                     <div class="online-users-list" id="onlineUsersList">
-                        <div class="no-users">0 users online</div>
+                        <div class="no-users">Join a room to see users</div>
                     </div>
                 </div>
-                
+
                 <div class="user-section">
-                    <h3>Your Name</h3>
-                <div class="user-info">
-                    <input type="text" id="username" placeholder="Enter your nickname..." value="" required>
-                    <button id="changeNameBtn">Change</button>
+                    <h3>✨ Your Nickname</h3>
+                    <div class="user-info">
+                        <input type="text" id="username" placeholder="Enter nickname..." autocomplete="off">
+                        <button id="changeNameBtn">Update</button>
+                    </div>
                 </div>
+
+                <div class="connection-status">
+                    <span id="connectionStatus">⚪ Not connected</span>
                 </div>
             </div>
 
             <div class="chat-container">
                 <div class="messages" id="messages"></div>
+
                 <div class="reply-preview" id="replyPreview" style="display: none;">
                     <div class="reply-info">
                         <span id="replyUsername"></span>
                         <span id="replyText"></span>
                     </div>
-                    <button class="cancel-reply" id="cancelReply">✕</button>
+                    <button class="cancel-reply" id="cancelReply" aria-label="Cancel reply">✕</button>
                 </div>
+
                 <div class="typing-indicator" id="typingIndicator" style="display: none;">
                     <span id="typingText">Someone is typing...</span>
                 </div>
+
                 <div class="input-area">
-                    <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
+                    <textarea id="messageInput" placeholder="Type your message..." rows="1"
+                        autocomplete="off"></textarea>
                     <button id="sendBtn">Send</button>
-                    <button id="testSendBtn" style="display: none; margin-left: 10px;">Test Send</button>
                 </div>
             </div>
         </main>
@@ -74,4 +89,5 @@
 
     <script src="script.js"></script>
 </body>
+
 </html>
