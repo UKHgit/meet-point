@@ -24,28 +24,24 @@ class ChatApp {
     }
 
     initializeElements() {
-        this.elements = {
-            messages: document.getElementById('messages'),
-            messageInput: document.getElementById('messageInput'),
-            sendBtn: document.getElementById('sendBtn'),
-            username: document.getElementById('username'),
-            userCount: document.getElementById('userCount'),
-            roomNameInput: document.getElementById('roomNameInput'),
-            joinRoomBtn: document.getElementById('joinRoomBtn'),
-            currentRoomDisplay: document.getElementById('currentRoomDisplay'),
-            replyPreview: document.getElementById('replyPreview'),
-            replyUsername: document.getElementById('replyUsername'),
-            replyText: document.getElementById('replyText'),
-            cancelReply: document.getElementById('cancelReply'),
-            changeNameBtn: document.getElementById('changeNameBtn'),
-            menuToggle: document.getElementById('menuToggle'),
-            mobileTitle: document.getElementById('mobileTitle'),
-            mobileUsers: document.getElementById('mobileUsers'),
-            sidebar: document.querySelector('.sidebar'),
-            onlineUsersList: document.getElementById('onlineUsersList'),
-            typingIndicator: document.getElementById('typingIndicator'),
-            typingText: document.getElementById('typingText')
-        };
+        this.elements = {};
+        
+        // Try to find all elements but handle missing ones gracefully
+        const elementIds = [
+            'messages', 'messageInput', 'sendBtn', 'username', 'userCount',
+            'roomNameInput', 'joinRoomBtn', 'currentRoomDisplay', 'replyPreview',
+            'replyUsername', 'replyText', 'cancelReply', 'changeNameBtn', 'menuToggle',
+            'mobileTitle', 'mobileUsers', 'sidebar', 'onlineUsersList',
+            'typingIndicator', 'typingText', 'debugInfo', 'debugPlatform',
+            'debugEndpoint', 'debugConnection', 'testSendBtn', 'testJoinBtn', 'testChangeNameBtn'
+        ];
+        
+        elementIds.forEach(id => {
+            this.elements[id] = document.getElementById(id);
+            if (!this.elements[id]) {
+                console.warn(`Element not found: #${id}`);
+            }
+        });
         
         // Initialize data structures
         this.onlineUsers = new Map();
@@ -279,8 +275,16 @@ connect() {
         });
     }
             
-            // Send username to server
-            if (this.username && this.username !== 'Anonymous') {
+        // Send username to server
+            if (this.socket && this.isConnected) {
+                this.socket.send(JSON.stringify({
+                    type: 'username',
+                    username: this.username
+                }));
+            }
+            
+            // Send username for GitHub Pages
+            if (this.socket && this.isConnected && this.isGitHub()) {
                 this.socket.send(JSON.stringify({
                     type: 'username',
                     username: this.username
