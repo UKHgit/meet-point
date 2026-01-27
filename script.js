@@ -10,6 +10,11 @@ class ChatApp {
         this.initializeElements();
         this.promptUsername();
         this.bindEvents();
+        
+        // Enable send button by default
+        if (this.elements.sendBtn) {
+            this.elements.sendBtn.disabled = false;
+        }
     }
 
     initializeElements() {
@@ -43,7 +48,10 @@ class ChatApp {
 
         // Message sending
         if (this.elements.sendBtn) {
-            this.elements.sendBtn.addEventListener('click', () => this.sendMessage());
+            this.elements.sendBtn.addEventListener('click', () => {
+                console.log('Send button clicked');
+                this.sendMessage();
+            });
         }
         if (this.elements.messageInput) {
             this.elements.messageInput.addEventListener('keypress', (e) => {
@@ -173,6 +181,9 @@ class ChatApp {
         this.socket.onopen = () => {
             this.isConnected = true;
             this.addSystemMessage('Connected to chat server');
+            if (this.elements.sendBtn) {
+                this.elements.sendBtn.disabled = false;
+            }
             this.joinRoom(this.currentRoom);
         };
 
@@ -206,7 +217,9 @@ class ChatApp {
         // Connect to Netlify Functions
         this.isConnected = true;
         this.addSystemMessage('Connected to chat server (Netlify mode)');
-        this.elements.sendBtn.disabled = false;
+        if (this.elements.sendBtn) {
+            this.elements.sendBtn.disabled = false;
+        }
         
         // Load initial messages
         this.loadMessages();
@@ -238,14 +251,26 @@ class ChatApp {
         }
     }
 
-    async     sendMessage() {
+    async sendMessage() {
+        console.log('sendMessage called');
+        
         if (!this.elements.messageInput) {
             console.error('Message input not found');
             return;
         }
         
         const text = this.elements.messageInput.value.trim();
-        if (!text || !this.isConnected) return;
+        console.log('Text:', text, 'Connected:', this.isConnected);
+        
+        if (!text) {
+            console.log('No text, returning');
+            return;
+        }
+        
+        if (!this.isConnected) {
+            console.log('Not connected, returning');
+            return;
+        }
 
         // Ensure we have a username
         if (!this.username || this.username === 'Anonymous' || this.username.trim() === '') {
