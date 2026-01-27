@@ -1,26 +1,28 @@
 /**
- * P2P Chat using Trystero (BitTorrent-based)
- * No servers needed - peers find each other via BitTorrent trackers
- * Works on GitHub Pages!
+ * Realtime Chat using Scaledrone (Free WebSocket service)
+ * Works on GitHub Pages - no backend needed!
+ * Free tier: unlimited messages, 20 concurrent users
  */
 
-class P2PChat {
+// Scaledrone Channel ID (free tier - create your own at scaledrone.com if needed)
+const SCALEDRONE_CHANNEL_ID = 'l1w1FPnpRvDjh0oT';
+
+class RealtimeChat {
     constructor() {
+        this.drone = null;
         this.room = null;
         this.username = '';
         this.currentRoomName = null;
-        this.myId = Math.random().toString(36).substr(2, 9);
+        this.myId = null;
         this.replyingTo = null;
-        this.peers = new Map(); // peerId -> username
-        this.sendMessage = null;
-        this.sendUserInfo = null;
-        this.sendTyping = null;
+        this.members = new Map();
+        this.typingTimeout = null;
 
         this.initializeElements();
         this.bindEvents();
         this.promptUsername();
 
-        console.log('P2P Chat initialized, my ID:', this.myId);
+        console.log('Realtime Chat initialized');
     }
 
     initializeElements() {
@@ -42,11 +44,10 @@ class P2PChat {
     }
 
     bindEvents() {
-        // Message sending
         if (this.elements.sendBtn) {
             this.elements.sendBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.handleSendMessage();
+                this.sendMessage();
             });
         }
 
@@ -54,22 +55,16 @@ class P2PChat {
             this.elements.messageInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    this.handleSendMessage();
+                    this.sendMessage();
                 }
             });
 
             this.elements.messageInput.addEventListener('input', () => {
                 this.elements.messageInput.style.height = 'auto';
                 this.elements.messageInput.style.height = Math.min(this.elements.messageInput.scrollHeight, 120) + 'px';
-
-                // Send typing indicator
-                if (this.elements.messageInput.value.trim() && this.sendTyping) {
-                    this.sendTyping({ username: this.username });
-                }
             });
         }
 
-        // Username change
         if (this.elements.changeNameBtn) {
             this.elements.changeNameBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -86,7 +81,6 @@ class P2PChat {
             });
         }
 
-        // Room joining
         if (this.elements.joinRoomBtn) {
             this.elements.joinRoomBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -103,7 +97,6 @@ class P2PChat {
             });
         }
 
-        // Reply handling
         if (this.elements.cancelReply) {
             this.elements.cancelReply.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -111,7 +104,6 @@ class P2PChat {
             });
         }
 
-        // Mobile menu
         if (this.elements.menuToggle) {
             this.elements.menuToggle.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -128,13 +120,6 @@ class P2PChat {
         });
 
         window.addEventListener('resize', () => this.handleResize());
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            if (this.room) {
-                this.room.leave();
-            }
-        });
     }
 
     promptUsername() {
@@ -164,21 +149,22 @@ class P2PChat {
         }
     }
 
-    async joinRoom() {
+    joinRoom() {
         const roomInput = this.elements.roomNameInput;
         if (!roomInput) return;
 
-        const roomName = roomInput.value.trim().toLowerCase();
+        const roomName = roomInput.value.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
         if (!roomName) {
-            this.addSystemMessage('Please enter a room name');
+            this.addSystemMessage('Please enter a valid room name (letters, numbers, - and _)');
             return;
         }
 
-        // Leave current room
-        if (this.room) {
-            this.room.leave();
+        // Disconnect from previous room
+        if (this.drone) {
+            this.drone.close();
+            this.drone = null;
             this.room = null;
-            this.peers.clear();
+            this.members.clear();
         }
 
         this.currentRoomName = roomName;
@@ -203,77 +189,111 @@ class P2PChat {
         this.updateStatus('Connecting...', 'connecting');
         this.addSystemMessage(`Joining room "${roomName}"...`);
 
+        this.connectToScaledrone(roomName);
+    }
+
+    connectToScaledrone(roomName) {
         try {
-            // Join room using Trystero (BitTorrent trackers)
-            const config = { appId: 'p2p-chat-app-2024' };
-            this.room = trystero.joinRoom(config, roomName);
-
-            // Set up message channels
-            const [sendMsg, getMsg] = this.room.makeAction('message');
-            const [sendInfo, getInfo] = this.room.makeAction('userinfo');
-            const [sendTyp, getTyp] = this.room.makeAction('typing');
-
-            this.sendMessage = sendMsg;
-            this.sendUserInfo = sendInfo;
-            this.sendTyping = sendTyp;
-
-            // Handle incoming messages
-            getMsg((data, peerId) => {
-                this.addMessage({
-                    id: data.id,
-                    username: data.username,
-                    text: data.text,
-                    replyTo: data.replyTo,
-                    timestamp: data.timestamp
-                }, false);
-            });
-
-            // Handle user info
-            getInfo((data, peerId) => {
-                const wasNew = !this.peers.has(peerId);
-                this.peers.set(peerId, data.username);
-                this.updatePeerList();
-                if (wasNew) {
-                    this.addSystemMessage(`${data.username} joined the room`);
+            this.drone = new Scaledrone(SCALEDRONE_CHANNEL_ID, {
+                data: {
+                    username: this.username,
+                    color: this.getRandomColor()
                 }
             });
 
-            // Handle typing
-            getTyp((data, peerId) => {
-                this.showTypingIndicator(data.username);
+            this.drone.on('open', error => {
+                if (error) {
+                    console.error('Scaledrone error:', error);
+                    this.updateStatus('Connection failed', 'error');
+                    this.addSystemMessage('❌ Failed to connect. Please try again.');
+                    return;
+                }
+
+                console.log('Connected to Scaledrone');
+                this.myId = this.drone.clientId;
+
+                // Subscribe to room (observable rooms start with 'observable-')
+                const roomId = 'observable-' + roomName;
+                this.room = this.drone.subscribe(roomId);
+
+                this.room.on('open', error => {
+                    if (error) {
+                        console.error('Room error:', error);
+                        this.updateStatus('Room error', 'error');
+                        return;
+                    }
+
+                    this.updateStatus('Connected', 'connected');
+                    this.addSystemMessage(`You joined "${roomName}" as ${this.username}`);
+                    this.addSystemMessage('💡 Share this room name with others to chat!');
+                });
+
+                // Handle members
+                this.room.on('members', members => {
+                    this.members.clear();
+                    members.forEach(member => {
+                        this.members.set(member.id, member.clientData);
+                    });
+                    this.updateMemberList();
+                });
+
+                this.room.on('member_join', member => {
+                    this.members.set(member.id, member.clientData);
+                    this.updateMemberList();
+                    if (member.id !== this.myId) {
+                        this.addSystemMessage(`${member.clientData.username} joined the room`);
+                    }
+                });
+
+                this.room.on('member_leave', member => {
+                    const username = this.members.get(member.id)?.username || 'Someone';
+                    this.members.delete(member.id);
+                    this.updateMemberList();
+                    this.addSystemMessage(`${username} left the room`);
+                });
+
+                // Handle messages
+                this.room.on('message', message => {
+                    this.handleIncomingMessage(message);
+                });
             });
 
-            // Handle peer join
-            this.room.onPeerJoin(peerId => {
-                console.log('Peer joined:', peerId);
-                // Send our info to new peer
-                this.sendUserInfo({ username: this.username }, peerId);
+            this.drone.on('error', error => {
+                console.error('Scaledrone error:', error);
+                this.updateStatus('Connection error', 'error');
             });
 
-            // Handle peer leave
-            this.room.onPeerLeave(peerId => {
-                const username = this.peers.get(peerId) || 'Someone';
-                this.peers.delete(peerId);
-                this.updatePeerList();
-                this.addSystemMessage(`${username} left the room`);
+            this.drone.on('close', () => {
+                this.updateStatus('Disconnected', 'error');
             });
-
-            this.updateStatus('Connected', 'connected');
-            this.addSystemMessage(`You joined "${roomName}" as ${this.username}`);
-            this.addSystemMessage('💡 Share this room name with others to chat!');
-
-            // Add self to peer list for display
-            this.updatePeerList();
 
         } catch (err) {
-            console.error('Error joining room:', err);
+            console.error('Error connecting:', err);
             this.updateStatus('Connection failed', 'error');
-            this.addSystemMessage('❌ Failed to join room. Please try again.');
+            this.addSystemMessage('❌ Failed to connect. Please try again.');
         }
     }
 
-    updatePeerList() {
-        const count = this.peers.size + 1; // +1 for self
+    handleIncomingMessage(message) {
+        const data = message.data;
+        const senderId = message.clientId;
+        const senderData = message.member?.clientData || { username: 'Unknown' };
+
+        if (data.type === 'message') {
+            this.addMessage({
+                id: data.id,
+                username: senderData.username,
+                text: data.text,
+                replyTo: data.replyTo,
+                timestamp: data.timestamp
+            }, senderId === this.myId);
+        } else if (data.type === 'typing' && senderId !== this.myId) {
+            this.showTypingIndicator(senderData.username);
+        }
+    }
+
+    updateMemberList() {
+        const count = this.members.size;
         const userText = `${count} user${count !== 1 ? 's' : ''}`;
 
         if (this.elements.userCount) {
@@ -284,27 +304,25 @@ class P2PChat {
         }
 
         if (this.elements.onlineUsersList) {
-            let html = `
-                <div class="online-user is-me">
-                    <span class="online-user-status">●</span>
-                    <span class="online-user-name">${this.escapeHtml(this.username)} (you)</span>
-                </div>
-            `;
-
-            this.peers.forEach((username, peerId) => {
-                html += `
-                    <div class="online-user" data-id="${peerId}">
-                        <span class="online-user-status">●</span>
-                        <span class="online-user-name">${this.escapeHtml(username)}</span>
-                    </div>
-                `;
-            });
-
-            this.elements.onlineUsersList.innerHTML = html;
+            if (count === 0) {
+                this.elements.onlineUsersList.innerHTML = '<div class="no-users">No users online</div>';
+            } else {
+                let html = '';
+                this.members.forEach((data, id) => {
+                    const isMe = id === this.myId;
+                    html += `
+                        <div class="online-user ${isMe ? 'is-me' : ''}" data-id="${id}">
+                            <span class="online-user-status" style="color: ${data.color || '#10b981'}">●</span>
+                            <span class="online-user-name">${this.escapeHtml(data.username)}${isMe ? ' (you)' : ''}</span>
+                        </div>
+                    `;
+                });
+                this.elements.onlineUsersList.innerHTML = html;
+            }
         }
     }
 
-    handleSendMessage() {
+    sendMessage() {
         if (!this.elements.messageInput) return;
 
         const text = this.elements.messageInput.value.trim();
@@ -316,8 +334,8 @@ class P2PChat {
         }
 
         const message = {
+            type: 'message',
             id: Math.random().toString(36).substr(2, 9),
-            username: this.username,
             text: text,
             replyTo: this.replyingTo ? {
                 username: this.replyingTo.username,
@@ -326,13 +344,11 @@ class P2PChat {
             timestamp: new Date().toISOString()
         };
 
-        // Send to all peers
-        if (this.sendMessage) {
-            this.sendMessage(message);
-        }
-
-        // Show locally
-        this.addMessage(message, true);
+        // Publish to room
+        this.drone.publish({
+            room: 'observable-' + this.currentRoomName,
+            message: message
+        });
 
         // Clear input
         this.elements.messageInput.value = '';
@@ -469,11 +485,10 @@ class P2PChat {
             localStorage.setItem('chatUsername', this.username);
             this.addSystemMessage(`Nickname: "${oldName}" → "${this.username}"`);
 
-            // Broadcast new name
-            if (this.sendUserInfo) {
-                this.sendUserInfo({ username: this.username });
+            // Reconnect to update username on server
+            if (this.currentRoomName) {
+                this.joinRoom();
             }
-            this.updatePeerList();
         } else if (!newName) {
             const name = prompt('Enter your new nickname:', this.username);
             if (name && name.trim()) {
@@ -484,23 +499,16 @@ class P2PChat {
                 }
                 localStorage.setItem('chatUsername', this.username);
                 this.addSystemMessage(`Nickname: "${oldName}" → "${this.username}"`);
-
-                if (this.sendUserInfo) {
-                    this.sendUserInfo({ username: this.username });
-                }
-                this.updatePeerList();
             }
         }
     }
 
     showTypingIndicator(username) {
-        if (!username || username === this.username) return;
         if (!this.elements.typingIndicator || !this.elements.typingText) return;
 
         this.elements.typingText.textContent = `${username} is typing...`;
         this.elements.typingIndicator.style.display = 'block';
 
-        // Hide after 3 seconds
         clearTimeout(this.typingTimeout);
         this.typingTimeout = setTimeout(() => {
             this.elements.typingIndicator.style.display = 'none';
@@ -519,6 +527,11 @@ class P2PChat {
         }
     }
 
+    getRandomColor() {
+        const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -528,6 +541,6 @@ class P2PChat {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Starting P2P Chat with Trystero...');
-    window.chatApp = new P2PChat();
+    console.log('Starting Realtime Chat...');
+    window.chatApp = new RealtimeChat();
 });
