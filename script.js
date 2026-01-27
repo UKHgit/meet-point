@@ -91,6 +91,10 @@ class RealtimeChat {
             });
 
             this.elements.messageInput.addEventListener('click', () => this.checkMentions());
+
+            this.elements.messageInput.addEventListener('focus', () => {
+                setTimeout(() => this.scrollToBottom(), 300);
+            });
         }
 
         // Join room
@@ -152,6 +156,7 @@ class RealtimeChat {
             if (window.innerWidth > 768 && this.elements.sidebar) {
                 this.elements.sidebar.classList.remove('expanded');
             }
+            this.scrollToBottom();
         });
 
         // URL hash change
