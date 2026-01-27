@@ -188,12 +188,26 @@ class ChatApp {
         }
     }
 
-    connect() {
+connect() {
         // Only connect if we have a room
         if (!this.currentRoom) {
             this.addSystemMessage('Please join a room to start chatting');
             return;
         }
+
+        // Check if we're on Netlify (no WebSocket support on free tier)
+        if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('netlify.com')) {
+            this.connectNetlify();
+        } else if (window.location.protocol === 'file:' || window.location.port === '8000') {
+            // Python server mode
+            this.connectStatic();
+        } else if (window.location.hostname.includes('github.io')) {
+            // GitHub Pages mode - use HTTP polling
+            this.connectGitHub();
+        } else {
+            this.connectWebSocket();
+        }
+    }
 
         // Check if we're on Netlify (no WebSocket support on free tier)
         if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('netlify.com')) {
@@ -209,10 +223,32 @@ class ChatApp {
     connectStatic() {
         // Static server mode - use HTTP polling
         this.isConnected = true;
-        this.addSystemMessage('Connected to chat server (HTTP mode)');
+        this.addSystemMessage('Connected to chat server (Static mode)');
         if (this.elements.sendBtn) {
             this.elements.sendBtn.disabled = false;
         }
+        
+        // Load initial messages
+        this.loadMessages();
+        
+        // Start polling for new messages
+        this.startPolling();
+    }
+
+    connectGitHub() {
+        // GitHub Pages mode - use HTTP polling
+        this.isConnected = true;
+        this.addSystemMessage('Connected to chat server (GitHub Pages mode)');
+        if (this.elements.sendBtn) {
+            this.elements.sendBtn.disabled = false;
+        }
+        
+        // Load initial messages
+        this.loadMessages();
+        
+        // Start polling for new messages
+        this.startPolling();
+    }
         
         // Send username to server
         if (this.username && this.username !== 'Anonymous') {
@@ -378,8 +414,8 @@ class ChatApp {
             if (this.socket) {
                 this.socket.send(JSON.stringify(message));
             } else {
-                // Use HTTP POST for static server or Netlify
-                const endpoint = window.location.port === '8000' ? '/api/message' : '/.netlify/functions/chat';
+                // Use HTTP POST for static server, GitHub Pages, or Netlify
+                const endpoint = this.getApiEndpoint();
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
@@ -750,6 +786,19 @@ class ChatApp {
 
     showSuccess(message) {
         console.log('Success:', message);
+    }
+
+    getApiEndpoint() {
+        // Determine the correct API endpoint based on the platform
+        if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('netlify.com')) {
+            return '/.netlify/functions/chat';
+        } else if (window.location.hostname.includes('github.io')) {
+            return '/api/chat';
+        } else if (window.location.port === '8000') {
+            return '/api/message';
+        } else {
+            return '/.netlify/functions/chat';
+        }
     }
 }
 
