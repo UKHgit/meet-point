@@ -289,7 +289,9 @@ class ChatApp {
                 break;
             case 'joinedRoom':
                 this.currentRoom = data.room;
-                this.elements.roomName.textContent = data.room;
+                if (this.elements.roomName) {
+                    this.elements.roomName.textContent = data.room;
+                }
                 this.highlightCurrentRoom();
                 this.clearMessages();
                 break;
@@ -369,6 +371,11 @@ class ChatApp {
                     id: Math.random().toString(36).substr(2, 9)
                 };
                 this.addMessage(messageData);
+                
+                // Mark message as sent locally
+                setTimeout(() => {
+                    this.addReadReceipt(messageData.id, 'delivered');
+                }, 500);
             }
             
             this.elements.messageInput.value = '';
@@ -393,8 +400,8 @@ class ChatApp {
         // Make message clickable for reply
         messageDiv.style.cursor = 'pointer';
         messageDiv.onclick = (e) => {
-            // Don't trigger on clicks to cancel button or reply tags
-            if (!e.target.closest('.cancel-reply') && !e.target.closest('.reply-tag')) {
+            // Only trigger on text area to avoid conflicts
+            if (e.target.closest('.message-text')) {
                 this.replyToMessage(data);
             }
         };
@@ -412,13 +419,19 @@ class ChatApp {
         content.className = 'message-content';
         
         // Add reply info if this is a reply
-        if (data.replyTo) {
+        if (data.replyTo && data.replyTo.username) {
             const replyDiv = document.createElement('div');
             replyDiv.className = 'message-reply';
             replyDiv.innerHTML = `
                 <span class="reply-tag">@${data.replyTo.username}</span> ${data.replyTo.text}
             `;
             content.appendChild(replyDiv);
+            
+            // Add reply-to field to message metadata
+            data.replyTo = {
+                username: data.replyTo.username,
+                text: data.replyTo.text
+            };
         }
         
         const header = document.createElement('div');
