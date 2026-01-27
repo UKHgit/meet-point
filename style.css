@@ -444,19 +444,61 @@ body {
     text-decoration: underline;
 }
 
+/* Mobile Header */
+.mobile-header {
+    display: none;
+    background: #2d2d2d;
+    padding: 1rem;
+    border-bottom: 1px solid #404040;
+    align-items: center;
+    gap: 1rem;
+}
+
+.mobile-title {
+    flex: 1;
+    text-align: center;
+    font-weight: bold;
+    color: #4CAF50;
+}
+
+.menu-toggle {
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
+    .header {
+        display: none; /* Hide desktop header on mobile */
+    }
+    
+    .mobile-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .main {
+        flex-direction: column;
+    }
+    
     .sidebar {
         width: 100%;
         position: fixed;
         bottom: 0;
         left: 0;
-        height: 200px;
+        height: 250px;
         border-right: none;
         border-top: 1px solid #404040;
-        z-index: 10;
-        transform: translateY(calc(100% - 60px));
+        z-index: 100;
+        transform: translateY(calc(100% - 70px));
         transition: transform 0.3s ease;
+        border-radius: 20px 20px 0 0;
     }
     
     .sidebar.expanded {
@@ -464,6 +506,171 @@ body {
     }
     
     .chat-container {
+        margin-bottom: 70px; /* Space for sidebar */
+        height: calc(100vh - 120px); /* Account for mobile header */
+    }
+    
+    .messages {
+        padding: 1rem 0.5rem; /* Less padding on mobile */
+    }
+    
+    .message {
+        margin-bottom: 0.75rem;
+        gap: 0.5rem;
+    }
+    
+    .message-avatar {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    .message-content {
+        max-width: 85%; /* More space on mobile */
+    }
+    
+    .message.sent .message-text,
+    .message.received .message-text {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+    }
+    
+    .input-area {
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+    
+    #messageInput {
+        padding: 0.6rem;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    #sendBtn {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .reply-preview {
+        padding: 0.4rem 0.75rem;
+        margin: 0.3rem 0.5rem;
+    }
+    
+    #replyUsername, #replyText {
+        font-size: 0.8rem;
+    }
+    
+    .cancel-reply {
+        top: 0.3rem;
+        right: 0.3rem;
+        font-size: 0.9rem;
+        padding: 0.2rem;
+    }
+    
+    .room-section, .user-section {
+        margin-bottom: 0.75rem;
+    }
+    
+    .room-section h3, .user-section h3 {
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .join-room {
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .join-room input, .join-room button {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+    }
+    
+    .current-room {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+    }
+    
+    .user-info {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .user-info input, .user-info button {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .mobile-header {
+        padding: 0.75rem;
+    }
+    
+    .mobile-title {
+        font-size: 1.1rem;
+    }
+    
+    .menu-toggle {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.9rem;
+    }
+    
+    .message-content {
+        max-width: 90%;
+    }
+    
+    .message.sent .message-text,
+    .message.received .message-text {
+        font-size: 0.85rem;
+        padding: 0.5rem;
+    }
+    
+    .message-avatar {
+        width: 28px;
+        height: 28px;
+        font-size: 0.9rem;
+    }
+    
+    .sidebar {
+        height: 220px;
+        transform: translateY(calc(100% - 60px));
+    }
+    
+    .chat-container {
         margin-bottom: 60px;
+    }
+    
+    .input-area {
+        padding: 0.5rem;
+        gap: 0.4rem;
+    }
+    
+    #messageInput {
+        padding: 0.5rem;
+        font-size: 16px; /* Keep 16px to prevent zoom */
+    }
+    
+    #sendBtn {
+        padding: 0.5rem 0.8rem;
+        font-size: 0.8rem;
+    }
+}
+
+/* Touch optimizations */
+@media (hover: none) and (pointer: coarse) {
+    .message-username {
+        padding: 4px;
+        min-height: 28px;
+        display: inline-block;
+    }
+    
+    .cancel-reply, .menu-toggle, #sendBtn {
+        min-height: 44px; /* iOS touch target size */
+        min-width: 44px;
+    }
+    
+    .join-room button, .user-info button {
+        min-height: 44px;
     }
 }

@@ -26,7 +26,11 @@ class ChatApp {
             replyUsername: document.getElementById('replyUsername'),
             replyText: document.getElementById('replyText'),
             cancelReply: document.getElementById('cancelReply'),
-            changeNameBtn: document.getElementById('changeNameBtn')
+            changeNameBtn: document.getElementById('changeNameBtn'),
+            menuToggle: document.getElementById('menuToggle'),
+            mobileTitle: document.getElementById('mobileTitle'),
+            mobileUsers: document.getElementById('mobileUsers'),
+            sidebar: document.querySelector('.sidebar')
         };
     }
 
@@ -73,6 +77,21 @@ class ChatApp {
         
         // Change name button
         this.elements.changeNameBtn.addEventListener('click', () => this.changeUsername());
+        
+        // Mobile menu toggle
+        this.elements.menuToggle.addEventListener('click', () => this.toggleMobileMenu());
+        
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                if (!this.elements.sidebar.contains(e.target)) {
+                    this.elements.sidebar.classList.remove('expanded');
+                }
+            }
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => this.handleResize());
     }
     }
 
@@ -346,7 +365,17 @@ class ChatApp {
         }
     }
 
-    async joinRoom() {
+    toggleMobileMenu() {
+        this.elements.sidebar.classList.toggle('expanded');
+    }
+
+    handleResize() {
+        if (window.innerWidth > 768) {
+            this.elements.sidebar.classList.remove('expanded');
+        }
+    }
+
+    async     joinRoom() {
         const roomName = this.elements.roomNameInput.value.trim();
         if (!roomName) {
             alert('Please enter a room name');
@@ -355,9 +384,13 @@ class ChatApp {
 
         this.currentRoom = roomName;
         this.elements.currentRoomDisplay.textContent = roomName;
+        this.elements.mobileTitle.textContent = roomName;
         this.elements.roomNameInput.value = '';
         this.clearMessages();
         this.addSystemMessage(`Joined room: ${roomName}`);
+        
+        // Close mobile menu
+        this.elements.sidebar.classList.remove('expanded');
         
         // Close existing connection
         if (this.eventSource) {
@@ -375,8 +408,12 @@ class ChatApp {
     }
 
     updateUserCount(count) {
+        const userText = `${count} user${count !== 1 ? 's' : ''}`;
         if (this.elements.userCount) {
-            this.elements.userCount.textContent = `${count} user${count !== 1 ? 's' : ''}`;
+            this.elements.userCount.textContent = userText;
+        }
+        if (this.elements.mobileUsers) {
+            this.elements.mobileUsers.textContent = userText;
         }
     }
 
