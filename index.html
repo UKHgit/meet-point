@@ -19,26 +19,33 @@
         <main class="main">
             <div class="sidebar">
                 <div class="room-section">
-                    <h3>Rooms</h3>
-                    <div class="room-list">
-                        <div class="room-item active" data-room="general">General</div>
+                    <h3>Private Room</h3>
+                    <div class="join-room">
+                        <input type="text" id="roomNameInput" placeholder="Enter room name...">
+                        <button id="joinRoomBtn">Join Room</button>
                     </div>
-                    <div class="create-room">
-                        <input type="text" id="newRoomName" placeholder="New room name...">
-                        <button id="createRoomBtn">Create</button>
+                    <div class="current-room">
+                        <span id="currentRoomDisplay">Not in room</span>
                     </div>
                 </div>
                 
                 <div class="user-section">
-                    <h3>You</h3>
+                    <h3>Your Name</h3>
                     <div class="user-info">
-                        <input type="text" id="username" placeholder="Enter your name..." value="Anonymous">
+                        <input type="text" id="username" placeholder="Enter your name..." value="">
                     </div>
                 </div>
             </div>
 
             <div class="chat-container">
                 <div class="messages" id="messages"></div>
+                <div class="reply-preview" id="replyPreview" style="display: none;">
+                    <div class="reply-info">
+                        <span id="replyUsername"></span>
+                        <span id="replyText"></span>
+                    </div>
+                    <button class="cancel-reply" id="cancelReply">✕</button>
+                </div>
                 <div class="input-area">
                     <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
                     <button id="sendBtn">Send</button>

@@ -166,6 +166,10 @@ body {
     gap: 0.75rem;
 }
 
+.message.sent {
+    flex-direction: row-reverse;
+}
+
 .message-avatar {
     width: 40px;
     height: 40px;
@@ -179,8 +183,17 @@ body {
     flex-shrink: 0;
 }
 
+.message.sent .message-avatar {
+    background: #2196F3;
+}
+
 .message-content {
     flex: 1;
+    max-width: 70%;
+}
+
+.message.sent .message-content {
+    text-align: right;
 }
 
 .message-header {
@@ -204,6 +217,22 @@ body {
     color: #e0e0e0;
     line-height: 1.4;
     word-wrap: break-word;
+    position: relative;
+}
+
+.message.sent .message-text {
+    background: #2196F3;
+    color: white;
+    padding: 0.75rem;
+    border-radius: 12px 12px 2px 12px;
+    display: inline-block;
+}
+
+.message.received .message-text {
+    background: #2d2d2d;
+    padding: 0.75rem;
+    border-radius: 12px 12px 12px 2px;
+    display: inline-block;
 }
 
 .system-message {
@@ -284,6 +313,115 @@ body {
 
 .messages::-webkit-scrollbar-thumb:hover {
     background: #666;
+}
+
+/* Reply preview */
+.reply-preview {
+    background: #2d2d2d;
+    border-left: 3px solid #4CAF50;
+    padding: 0.5rem 1rem;
+    margin: 0.5rem;
+    border-radius: 4px;
+    position: relative;
+}
+
+.reply-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+#replyUsername {
+    font-weight: bold;
+    color: #4CAF50;
+    font-size: 0.875rem;
+}
+
+#replyText {
+    color: #b0b0b0;
+    font-size: 0.875rem;
+    font-style: italic;
+}
+
+.cancel-reply {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: none;
+    border: none;
+    color: #808080;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.cancel-reply:hover {
+    color: #e0e0e0;
+}
+
+/* Join room section */
+.join-room {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.join-room input {
+    flex: 1;
+    padding: 0.5rem;
+    background: #2d2d2d;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    color: #e0e0e0;
+}
+
+.join-room input::placeholder {
+    color: #808080;
+}
+
+.join-room button {
+    padding: 0.5rem 1rem;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.join-room button:hover {
+    background: #45a049;
+}
+
+.current-room {
+    background: #2d2d2d;
+    padding: 0.75rem;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: bold;
+}
+
+#currentRoomDisplay {
+    color: #4CAF50;
+}
+
+/* Message reply styling */
+.message-reply {
+    background: rgba(76, 175, 80, 0.1);
+    border-left: 3px solid #4CAF50;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.reply-tag {
+    color: #4CAF50;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.reply-tag:hover {
+    text-decoration: underline;
 }
 
 /* Responsive design */

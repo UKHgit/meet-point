@@ -2,13 +2,8 @@
 const rooms = new Map();
 const connections = new Map();
 
-// Initialize default room
-rooms.set('general', {
-  name: 'general',
-  users: new Set(),
-  messages: [],
-  created: new Date()
-});
+// No default room - private room system
+// Rooms are created on-demand when users join them
 
 exports.handler = async (event, context) => {
   const { httpMethod, path, body } = event;
@@ -28,12 +23,11 @@ exports.handler = async (event, context) => {
 
   try {
     if (path === '/.netlify/functions/chat' && httpMethod === 'GET') {
-      // Get room list
-      const roomList = Array.from(rooms.keys());
+      // No room list for private rooms
       return {
         statusCode: 200,
         headers,
-        body: JSON.stringify({ rooms: roomList })
+        body: JSON.stringify({ status: 'Private chat system' })
       };
     }
 
@@ -57,6 +51,7 @@ exports.handler = async (event, context) => {
           username: username || 'Anonymous',
           text: text.trim(),
           room,
+          replyTo: data.replyTo || null,
           timestamp: new Date().toISOString(),
           id: Math.random().toString(36).substr(2, 9)
         };
@@ -74,28 +69,8 @@ exports.handler = async (event, context) => {
         };
       }
 
-      if (type === 'createRoom') {
-        if (rooms.has(room)) {
-          return {
-            statusCode: 400,
-            headers,
-            body: JSON.stringify({ error: 'Room already exists' })
-          };
-        }
-
-        rooms.set(room, {
-          name: room,
-          users: new Set(),
-          messages: [],
-          created: new Date()
-        });
-
-        return {
-          statusCode: 200,
-          headers,
-          body: JSON.stringify({ success: true, room })
-        };
-      }
+      // No create room function needed for private rooms
+      // Users can join any room by name
 
       if (type === 'getMessages') {
         const roomData = rooms.get(room);

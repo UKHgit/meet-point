@@ -9,12 +9,8 @@ class ChatServer {
         this.rooms = new Map();
         this.clients = new Map();
         
-        // Initialize default room
-        this.rooms.set('general', {
-            name: 'general',
-            users: new Set(),
-            created: new Date()
-        });
+        // No default room - private room system
+        // Rooms are created on-demand when users join them
         
         this.createServer();
     }
@@ -70,7 +66,7 @@ class ChatServer {
         this.wss = new WebSocket.Server({ server });
         this.setupWebSocketHandlers();
         
-        const PORT = process.env.PORT || 3000;
+        const PORT = process.env.PORT || 8080;
         server.listen(PORT, () => {
             console.log(`Chat server running on port ${PORT}`);
             console.log(`Open http://localhost:${PORT} in your browser`);

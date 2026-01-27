@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:3001": "PORT=3001 node server.js",
     "dev": "node server.js",
     "build": "echo 'No build step required'",
     "netlify-build": "echo 'Ready for Netlify deployment'"

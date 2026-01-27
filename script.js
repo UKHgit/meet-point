@@ -1,14 +1,15 @@
 class ChatApp {
     constructor() {
         this.eventSource = null;
-        this.currentRoom = 'general';
-        this.username = 'Anonymous';
+        this.currentRoom = null;
+        this.username = '';
         this.isConnected = false;
         this.clientId = Math.random().toString(36).substr(2, 9);
+        this.replyingTo = null;
         
         this.initializeElements();
+        this.promptUsername();
         this.bindEvents();
-        this.connect();
     }
 
     initializeElements() {
@@ -17,11 +18,14 @@ class ChatApp {
             messageInput: document.getElementById('messageInput'),
             sendBtn: document.getElementById('sendBtn'),
             username: document.getElementById('username'),
-            roomName: document.getElementById('roomName'),
             userCount: document.getElementById('userCount'),
-            roomList: document.querySelector('.room-list'),
-            newRoomName: document.getElementById('newRoomName'),
-            createRoomBtn: document.getElementById('createRoomBtn')
+            roomNameInput: document.getElementById('roomNameInput'),
+            joinRoomBtn: document.getElementById('joinRoomBtn'),
+            currentRoomDisplay: document.getElementById('currentRoomDisplay'),
+            replyPreview: document.getElementById('replyPreview'),
+            replyUsername: document.getElementById('replyUsername'),
+            replyText: document.getElementById('replyText'),
+            cancelReply: document.getElementById('cancelReply')
         };
     }
 
@@ -42,39 +46,50 @@ class ChatApp {
         });
 
         // Username change
-        this.elements.username.addEventListener('change', async () => {
-            this.username = this.elements.username.value.trim() || 'Anonymous';
-            if (this.isConnected) {
-                if (this.socket) {
-                    this.socket.send(JSON.stringify({
-                        type: 'username',
-                        username: this.username
-                    }));
-                } else {
-                    // Send system message for username change in SSE
-                    await this.sendSystemMessage(`${this.elements.username.previousValue || 'Anonymous'} is now known as ${this.username}`);
-                    this.elements.username.previousValue = this.username;
-                }
+        this.elements.username.addEventListener('change', () => {
+            this.username = this.elements.username.value.trim();
+            if (this.username) {
+                localStorage.setItem('chatUsername', this.username);
             }
         });
 
-        // Room creation
-        this.elements.createRoomBtn.addEventListener('click', () => this.createRoom());
-        this.elements.newRoomName.addEventListener('keypress', (e) => {
+        // Room joining
+        this.elements.joinRoomBtn.addEventListener('click', () => this.joinRoom());
+        this.elements.roomNameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                this.createRoom();
+                this.joinRoom();
             }
         });
 
-        // Room switching
-        this.elements.roomList.addEventListener('click', (e) => {
-            if (e.target.classList.contains('room-item')) {
-                this.joinRoom(e.target.dataset.room);
+        // Reply handling
+        this.elements.cancelReply.addEventListener('click', () => this.cancelReply());
+    }
+
+    promptUsername() {
+        const savedUsername = localStorage.getItem('chatUsername');
+        if (savedUsername) {
+            this.username = savedUsername;
+            this.elements.username.value = savedUsername;
+        } else {
+            const name = prompt('Please enter your name:');
+            if (name) {
+                this.username = name.trim();
+                this.elements.username.value = this.username;
+                localStorage.setItem('chatUsername', this.username);
+            } else {
+                this.username = 'Anonymous';
+                this.elements.username.value = 'Anonymous';
             }
-        });
+        }
     }
 
     connect() {
+        // Only connect if we have a room
+        if (!this.currentRoom) {
+            this.addSystemMessage('Please join a room to start chatting');
+            return;
+        }
+
         // Check if we're on Netlify (no WebSocket support on free tier)
         if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('netlify.com')) {
             this.connectNetlify();
@@ -127,8 +142,7 @@ class ChatApp {
         this.addSystemMessage('Connected to chat server (Netlify mode)');
         this.elements.sendBtn.disabled = false;
         
-        // Load initial data
-        this.loadRoomList();
+        // Load initial messages
         this.loadMessages();
         
         // Start polling for new messages
@@ -166,7 +180,8 @@ class ChatApp {
             type: 'message',
             text: text,
             room: this.currentRoom,
-            username: this.username
+            username: this.username,
+            replyTo: this.replyingTo
         };
 
         try {
@@ -187,15 +202,17 @@ class ChatApp {
                 }
                 
                 // Add message locally for instant feedback
-                this.addMessage({
+                const messageData = {
                     ...message,
                     timestamp: new Date().toISOString(),
                     id: Math.random().toString(36).substr(2, 9)
-                });
+                };
+                this.addMessage(messageData);
             }
             
             this.elements.messageInput.value = '';
             this.elements.messageInput.style.height = 'auto';
+            this.cancelReply();
         } catch (error) {
             console.error('Error sending message:', error);
             this.addSystemMessage('Failed to send message');
@@ -203,8 +220,10 @@ class ChatApp {
     }
 
     addMessage(data) {
+        const isSent = data.username === this.username;
         const messageDiv = document.createElement('div');
-        messageDiv.className = 'message';
+        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+        messageDiv.dataset.messageId = data.id;
         
         const avatar = document.createElement('div');
         avatar.className = 'message-avatar';
@@ -213,12 +232,24 @@ class ChatApp {
         const content = document.createElement('div');
         content.className = 'message-content';
         
+        // Add reply info if this is a reply
+        if (data.replyTo) {
+            const replyDiv = document.createElement('div');
+            replyDiv.className = 'message-reply';
+            replyDiv.innerHTML = `
+                <span class="reply-tag">@${data.replyTo.username}</span> ${data.replyTo.text}
+            `;
+            content.appendChild(replyDiv);
+        }
+        
         const header = document.createElement('div');
         header.className = 'message-header';
         
         const username = document.createElement('span');
         username.className = 'message-username';
         username.textContent = data.username;
+        username.classList.add('reply-tag');
+        username.onclick = () => this.replyToMessage(data);
         
         const time = document.createElement('span');
         time.className = 'message-time';
@@ -228,13 +259,22 @@ class ChatApp {
         text.className = 'message-text';
         text.textContent = data.text;
         
-        header.appendChild(username);
-        header.appendChild(time);
-        content.appendChild(header);
+        if (!isSent) {
+            header.appendChild(username);
+            header.appendChild(time);
+            content.appendChild(header);
+        }
+        
         content.appendChild(text);
         
-        messageDiv.appendChild(avatar);
-        messageDiv.appendChild(content);
+        if (isSent) {
+            content.appendChild(header);
+            messageDiv.appendChild(content);
+            messageDiv.appendChild(avatar);
+        } else {
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(content);
+        }
         
         this.elements.messages.appendChild(messageDiv);
         this.scrollToBottom();
@@ -257,110 +297,56 @@ class ChatApp {
         this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
     }
 
-    async createRoom() {
-        const roomName = this.elements.newRoomName.value.trim();
-        if (!roomName) return;
-        
-        try {
-            if (this.socket) {
-                this.socket.send(JSON.stringify({
-                    type: 'createRoom',
-                    room: roomName
-                }));
-            } else {
-                // Use Netlify Functions
-                const response = await fetch('/.netlify/functions/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        type: 'createRoom',
-                        room: roomName
-                    })
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    this.addSystemMessage(error.error || 'Failed to create room');
-                    return;
-                }
-                
-                // Refresh room list
-                this.loadRoomList();
-                this.addSystemMessage(`Room '${roomName}' created successfully`);
-            }
-            
-            this.elements.newRoomName.value = '';
-        } catch (error) {
-            console.error('Error creating room:', error);
-            this.addSystemMessage('Failed to create room');
-        }
+    replyToMessage(message) {
+        this.replyingTo = message;
+        this.elements.replyPreview.style.display = 'block';
+        this.elements.replyUsername.textContent = `Replying to @${message.username}`;
+        this.elements.replyText.textContent = message.text;
+        this.elements.messageInput.focus();
     }
 
-    async joinRoom(room) {
-        if (room === this.currentRoom) return;
+    cancelReply() {
+        this.replyingTo = null;
+        this.elements.replyPreview.style.display = 'none';
+        this.elements.messageInput.focus();
+    }
+
+    async joinRoom() {
+        const roomName = this.elements.roomNameInput.value.trim();
+        if (!roomName) {
+            alert('Please enter a room name');
+            return;
+        }
+
+        this.currentRoom = roomName;
+        this.elements.currentRoomDisplay.textContent = roomName;
+        this.elements.roomNameInput.value = '';
+        this.clearMessages();
+        this.addSystemMessage(`Joined room: ${roomName}`);
         
+        // Close existing connection
+        if (this.eventSource) {
+            this.eventSource.close();
+        }
         if (this.socket) {
-            this.socket.send(JSON.stringify({
-                type: 'joinRoom',
-                room: room
-            }));
-        } else {
-            // Reconnect SSE with new room
-            this.currentRoom = room;
-            this.elements.roomName.textContent = room;
-            this.highlightCurrentRoom();
-            this.clearMessages();
-            
-            // Close current connection and reconnect
-            if (this.eventSource) {
-                this.eventSource.close();
-            }
-            this.connectSSE();
-            
-            await this.sendSystemMessage(`Joined room: ${room}`);
+            this.socket.close();
         }
-    }
-
-    updateRoomList(rooms) {
-        this.elements.roomList.innerHTML = '';
         
-        rooms.forEach(room => {
-            const roomDiv = document.createElement('div');
-            roomDiv.className = 'room-item';
-            roomDiv.dataset.room = room;
-            roomDiv.textContent = room;
-            
-            if (room === this.currentRoom) {
-                roomDiv.classList.add('active');
-            }
-            
-            this.elements.roomList.appendChild(roomDiv);
-        });
+        this.connect();
     }
 
     highlightCurrentRoom() {
-        const roomItems = this.elements.roomList.querySelectorAll('.room-item');
-        roomItems.forEach(item => {
-            item.classList.toggle('active', item.dataset.room === this.currentRoom);
-        });
+        // Not needed for private rooms
     }
 
     updateUserCount(count) {
-        this.elements.userCount.textContent = `${count} user${count !== 1 ? 's' : ''}`;
+        if (this.elements.userCount) {
+            this.elements.userCount.textContent = `${count} user${count !== 1 ? 's' : ''}`;
+        }
     }
 
     async loadRoomList() {
-        try {
-            const response = await fetch('/.netlify/functions/chat');
-            const data = await response.json();
-            if (data.rooms) {
-                this.updateRoomList(data.rooms);
-            }
-        } catch (error) {
-            console.error('Error loading room list:', error);
-        }
+        // Not needed for private rooms
     }
 
     async loadMessages() {
