@@ -178,7 +178,7 @@ class ChatApp {
                     break;
                 }
                 if (name.trim() === '') {
-                    alert('Please enter a valid nickname');
+                    this.showError('Please enter a valid nickname');
                 }
             }
             
@@ -224,7 +224,9 @@ class ChatApp {
                 }));
             }
             
-            this.joinRoom(this.currentRoom);
+            if (this.currentRoom) {
+                this.joinRoom(this.currentRoom);
+            }
         };
 
         this.socket.onmessage = (event) => {
@@ -241,6 +243,10 @@ class ChatApp {
             this.addSystemMessage('Disconnected from chat server');
             this.elements.sendBtn.disabled = true;
             
+            // Clear online users when disconnected
+            this.onlineUsers.clear();
+            this.updateOnlineUsers();
+            
             // Attempt to reconnect after 3 seconds
             setTimeout(() => {
                 this.connect();
@@ -248,8 +254,7 @@ class ChatApp {
         };
 
         this.socket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            this.addSystemMessage('Connection error');
+            this.handleError(error);
         };
     }
 
@@ -503,12 +508,12 @@ class ChatApp {
     }
 
     changeUsername() {
-        const newName = prompt('Enter your new name:', this.username);
+        const newName = prompt('Enter your new nickname:', this.username);
         if (newName !== null && newName.trim()) {
             this.username = newName.trim();
             this.elements.username.value = this.username;
             localStorage.setItem('chatUsername', this.username);
-            this.addSystemMessage(`Your name is now: ${this.username}`);
+            this.addSystemMessage(`Your nickname is now: ${this.username}`);
         }
     }
 
@@ -571,7 +576,10 @@ class ChatApp {
         if (!this.elements.onlineUsersList) return;
         
         const users = Array.from(this.onlineUsers.keys());
-        if (users.length === 0) {
+        const onlineCount = users.length;
+        
+        // Update sidebar
+        if (onlineCount === 0) {
             this.elements.onlineUsersList.innerHTML = '<div class="no-users">No users online</div>';
         } else {
             this.elements.onlineUsersList.innerHTML = users.map(username => `
@@ -582,7 +590,12 @@ class ChatApp {
             `).join('');
         }
         
-        this.updateUserCount(users.length);
+        // Update mobile header
+        if (this.elements.mobileUsers) {
+            this.elements.mobileUsers.textContent = `${onlineCount} user${onlineCount !== 1 ? 's' : ''} online`;
+        }
+        
+        this.updateUserCount(onlineCount);
     }
 
     addReadReceipt(messageId, status = 'delivered') {
@@ -598,7 +611,7 @@ class ChatApp {
     async     joinRoom() {
         const roomName = this.elements.roomNameInput.value.trim();
         if (!roomName) {
-            alert('Please enter a room name');
+            this.showError('Please enter a room name');
             return;
         }
 
@@ -610,7 +623,7 @@ class ChatApp {
         
         // Check if room is new or existing
         if (this.isLikelyNewRoom(roomName)) {
-            this.addSystemMessage(`Welcome to your new room "${roomName}"! ${this.username ? `Your nickname is ${this.username}.` : 'You can set your nickname below.'}`);
+            this.addSystemMessage(`Welcome to your new room "${roomName}"! ${this.username ? `Your nickname is ${this.username}.` : 'You can set your nickname in the sidebar.'}`);
         } else {
             this.addSystemMessage(`${this.username || 'Someone'} joined room "${roomName}"`);
         }
@@ -687,6 +700,15 @@ class ChatApp {
                 this.loadMessages();
             }
         }, 3000);
+        }
+    }
+
+    showError(message) {
+        alert(message);
+    }
+
+    showSuccess(message) {
+        console.log('Success:', message);
     }
 }
 
