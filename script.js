@@ -111,6 +111,13 @@ class ChatApp {
                 }
             }
         });
+
+        // Close mobile menu on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.elements.sidebar && this.elements.sidebar.classList.contains('expanded')) {
+                this.elements.sidebar.classList.remove('expanded');
+            }
+        });
         
         // Handle window resize
         window.addEventListener('resize', () => this.handleResize());
@@ -417,8 +424,10 @@ class ChatApp {
         this.clearMessages();
         this.addSystemMessage(`Joined room: ${roomName}`);
         
-        // Close mobile menu
-        this.elements.sidebar.classList.remove('expanded');
+        // Close mobile menu on mobile only
+        if (window.innerWidth <= 768 && this.elements.sidebar) {
+            this.elements.sidebar.classList.remove('expanded');
+        }
         
         // Close existing connection
         if (this.eventSource) {
