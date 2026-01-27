@@ -76,13 +76,13 @@ class ChatServer {
     setupWebSocketHandlers() {
         this.wss.on('connection', (ws) => {
             const clientId = this.generateId();
-            const client = {
-                id: clientId,
-                ws: ws,
-                username: 'Anonymous',
-                room: null,
-                joinedAt: new Date()
-            };
+        const client = {
+            id: clientId,
+            ws: ws,
+            username: 'Anonymous',
+            room: null,
+            joinedAt: new Date()
+        };
             
             this.clients.set(clientId, client);
             
@@ -109,10 +109,10 @@ class ChatServer {
                 rooms: Array.from(this.rooms.keys())
             });
             
-            // Don't auto-join - wait for user to join manually
+            // Welcome message with instructions
             this.sendToClient(client, {
                 type: 'system',
-                text: 'Please join a room to start chatting'
+                text: 'Welcome! Join a room by entering its name below. You can set your nickname in the sidebar.'
             });
         });
     }
@@ -176,10 +176,17 @@ class ChatServer {
         client.username = username.trim() || 'Anonymous';
         
         if (client.room) {
-            this.broadcastToRoom(client.room, {
-                type: 'system',
-                text: `${oldUsername} is now known as ${client.username}`
-            });
+            if (oldUsername !== 'Anonymous' && client.username !== 'Anonymous') {
+                this.broadcastToRoom(client.room, {
+                    type: 'system',
+                    text: `${oldUsername}'s nickname is now: ${client.username}`
+                });
+            } else if (oldUsername === 'Anonymous' && client.username !== 'Anonymous') {
+                this.broadcastToRoom(client.room, {
+                    type: 'system',
+                    text: `${client.username} has set their nickname`
+                });
+            }
         }
     }
 
@@ -231,7 +238,7 @@ class ChatServer {
             
             this.broadcastToRoom(roomName, {
                 type: 'system',
-                text: `${client.username} joined the room`
+                text: `${client.username} has joined the room "${roomName}"`
             });
             
             this.updateUserCount(room.users.size);

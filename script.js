@@ -98,7 +98,7 @@ class ChatApp {
                     const oldUsername = this.username;
                     this.username = newName;
                     localStorage.setItem('chatUsername', this.username);
-                    this.addSystemMessage(`Your name is now: ${this.username}`);
+                    this.addSystemMessage(`Your nickname is now: ${this.username}`);
                     
                     // Send username update to server
                     if (this.socket && this.isConnected) {
@@ -110,7 +110,7 @@ class ChatApp {
                 } else {
                     // Revert to previous name if empty
                     this.elements.username.value = this.username;
-                    alert('Name cannot be empty');
+                    alert('Nickname cannot be empty');
                 }
             });
         }
@@ -171,14 +171,14 @@ class ChatApp {
             // Keep asking until user enters a name
             let name = '';
             while (!name || !name.trim()) {
-                name = prompt('Please enter your name:');
+                name = prompt('Please enter your nickname:');
                 if (name === null) {
                     // User cancelled
                     name = 'Anonymous';
                     break;
                 }
                 if (name.trim() === '') {
-                    alert('Please enter a valid name');
+                    alert('Please enter a valid nickname');
                 }
             }
             
@@ -595,7 +595,13 @@ class ChatApp {
         this.elements.mobileTitle.textContent = roomName;
         this.elements.roomNameInput.value = '';
         this.clearMessages();
-        this.addSystemMessage(`Joined room: ${roomName}`);
+        
+        // Check if room is new or existing
+        if (this.isLikelyNewRoom(roomName)) {
+            this.addSystemMessage(`Welcome to your new room "${roomName}"! ${this.username ? `Your nickname is ${this.username}.` : 'You can set your nickname below.'}`);
+        } else {
+            this.addSystemMessage(`${this.username || 'Someone'} joined room "${roomName}"`);
+        }
         
         // Close mobile menu on mobile only
         if (window.innerWidth <= 768 && this.elements.sidebar) {
@@ -611,6 +617,12 @@ class ChatApp {
         }
         
         this.connect();
+    }
+
+    isLikelyNewRoom(roomName) {
+        // Heuristic: room is likely new if it's not a common name and the user just entered it
+        const commonRoomNames = ['general', 'chat', 'lobby', 'main', 'default'];
+        return !commonRoomNames.includes(roomName.toLowerCase());
     }
 
     highlightCurrentRoom() {
