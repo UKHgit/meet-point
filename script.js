@@ -1,29 +1,39 @@
 /**
- * Realtime Chat using Ably (Free real-time service)
- * Works on GitHub Pages - no backend needed!
- * Free tier: 6M messages/month, 500 concurrent connections
+ * Realtime Chat using Gun.js
+ * Decentralized, no API keys needed, works on GitHub Pages!
+ * Uses public Gun relay servers for cross-internet sync
  */
-
-// Ably API Key (free tier - you can create your own at ably.com)
-const ABLY_API_KEY = 'xVLyHw.Dq0_dQ:rIp5DfKRG0WmVlJsjVfwdXQPMeVw6fDJfSLoRl2pxPo';
 
 class RealtimeChat {
     constructor() {
-        this.ably = null;
-        this.channel = null;
-        this.presenceChannel = null;
+        this.gun = null;
+        this.room = null;
         this.username = '';
         this.currentRoomName = null;
-        this.clientId = null;
+        this.clientId = 'user-' + Math.random().toString(36).substr(2, 9);
         this.replyingTo = null;
+        this.seenMessages = new Set();
         this.members = new Map();
-        this.typingTimeout = null;
 
         this.initializeElements();
         this.bindEvents();
         this.promptUsername();
+        this.initGun();
 
-        console.log('Realtime Chat initialized');
+        console.log('Realtime Chat initialized, ID:', this.clientId);
+    }
+
+    initGun() {
+        // Initialize Gun with public relay servers
+        this.gun = Gun({
+            peers: [
+                'https://gun-manhattan.herokuapp.com/gun',
+                'https://gun-us.herokuapp.com/gun'
+            ]
+        });
+
+        this.updateStatus('Ready to connect', 'info');
+        console.log('Gun initialized');
     }
 
     initializeElements() {
@@ -33,8 +43,7 @@ class RealtimeChat {
             'messages', 'messageInput', 'sendBtn', 'username', 'userCount',
             'roomNameInput', 'joinRoomBtn', 'currentRoomDisplay', 'replyPreview',
             'replyUsername', 'replyText', 'cancelReply', 'changeNameBtn', 'menuToggle',
-            'mobileTitle', 'mobileUsers', 'onlineUsersList',
-            'typingIndicator', 'typingText', 'roomName', 'connectionStatus'
+            'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus'
         ];
 
         elementIds.forEach(id => {
@@ -123,11 +132,8 @@ class RealtimeChat {
         window.addEventListener('resize', () => this.handleResize());
 
         window.addEventListener('beforeunload', () => {
-            if (this.presenceChannel) {
-                this.presenceChannel.presence.leave();
-            }
-            if (this.ably) {
-                this.ably.close();
+            if (this.currentRoomName) {
+                this.leaveRoom();
             }
         });
     }
@@ -150,8 +156,6 @@ class RealtimeChat {
             }
             localStorage.setItem('chatUsername', this.username);
         }
-
-        this.clientId = 'user-' + Math.random().toString(36).substr(2, 9);
     }
 
     updateStatus(status, type = 'info') {
@@ -167,23 +171,17 @@ class RealtimeChat {
 
         const roomName = roomInput.value.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
         if (!roomName) {
-            this.addSystemMessage('Please enter a valid room name (letters, numbers, - and _)');
+            this.addSystemMessage('Please enter a valid room name');
             return;
         }
 
-        // Disconnect from previous
-        if (this.ably) {
-            if (this.presenceChannel) {
-                this.presenceChannel.presence.leave();
-            }
-            this.ably.close();
-            this.ably = null;
-            this.channel = null;
-            this.presenceChannel = null;
-            this.members.clear();
+        // Leave current room
+        if (this.currentRoomName) {
+            this.leaveRoom();
         }
 
         this.currentRoomName = roomName;
+        this.seenMessages.clear();
 
         if (this.elements.currentRoomDisplay) {
             this.elements.currentRoomDisplay.textContent = roomName;
@@ -205,86 +203,77 @@ class RealtimeChat {
         this.updateStatus('Connecting...', 'connecting');
         this.addSystemMessage(`Joining room "${roomName}"...`);
 
-        this.connectToAbly(roomName);
+        // Get room reference
+        this.room = this.gun.get('chat-room-' + roomName);
+
+        // Subscribe to messages
+        this.room.get('messages').map().on((data, key) => {
+            if (data && !this.seenMessages.has(key)) {
+                this.seenMessages.add(key);
+                this.handleIncomingMessage(data);
+            }
+        });
+
+        // Register presence
+        this.registerPresence();
+
+        // Subscribe to presence
+        this.room.get('presence').map().on((data, key) => {
+            if (data && data.online && Date.now() - data.lastSeen < 30000) {
+                this.members.set(key, data);
+            } else {
+                this.members.delete(key);
+            }
+            this.updateMemberList();
+        });
+
+        this.updateStatus('Connected', 'connected');
+        this.addSystemMessage(`You joined "${roomName}" as ${this.username}`);
+        this.addSystemMessage('💡 Share this room name with others to chat!');
     }
 
-    connectToAbly(roomName) {
-        try {
-            // Initialize Ably
-            this.ably = new Ably.Realtime({
-                key: ABLY_API_KEY,
-                clientId: this.clientId
+    registerPresence() {
+        if (!this.room || !this.currentRoomName) return;
+
+        const updatePresence = () => {
+            this.room.get('presence').get(this.clientId).put({
+                username: this.username,
+                color: this.getRandomColor(),
+                lastSeen: Date.now(),
+                online: true
             });
+        };
 
-            this.ably.connection.on('connected', () => {
-                console.log('Connected to Ably');
+        updatePresence();
 
-                // Subscribe to messages channel
-                this.channel = this.ably.channels.get('chat-' + roomName);
+        // Update presence every 10 seconds
+        this.presenceInterval = setInterval(updatePresence, 10000);
+    }
 
-                // Subscribe to presence channel
-                this.presenceChannel = this.ably.channels.get('chat-' + roomName);
-
-                // Handle messages
-                this.channel.subscribe('message', (msg) => {
-                    this.handleIncomingMessage(msg.data);
-                });
-
-                // Enter presence
-                this.presenceChannel.presence.enter({ username: this.username, color: this.getRandomColor() });
-
-                // Get current members
-                this.presenceChannel.presence.get((err, members) => {
-                    if (err) {
-                        console.error('Presence error:', err);
-                        return;
-                    }
-                    this.members.clear();
-                    members.forEach(member => {
-                        this.members.set(member.clientId, member.data);
-                    });
-                    this.updateMemberList();
-                });
-
-                // Handle presence events
-                this.presenceChannel.presence.subscribe('enter', (member) => {
-                    this.members.set(member.clientId, member.data);
-                    this.updateMemberList();
-                    if (member.clientId !== this.clientId) {
-                        this.addSystemMessage(`${member.data.username} joined the room`);
-                    }
-                });
-
-                this.presenceChannel.presence.subscribe('leave', (member) => {
-                    const username = this.members.get(member.clientId)?.username || 'Someone';
-                    this.members.delete(member.clientId);
-                    this.updateMemberList();
-                    this.addSystemMessage(`${username} left the room`);
-                });
-
-                this.updateStatus('Connected', 'connected');
-                this.addSystemMessage(`You joined "${roomName}" as ${this.username}`);
-                this.addSystemMessage('💡 Share this room name with others to chat!');
-            });
-
-            this.ably.connection.on('failed', (err) => {
-                console.error('Ably connection failed:', err);
-                this.updateStatus('Connection failed', 'error');
-                this.addSystemMessage('❌ Failed to connect. Please try again.');
-            });
-
-            this.ably.connection.on('disconnected', () => {
-                this.updateStatus('Disconnected', 'error');
-            });
-
-        } catch (err) {
-            console.error('Error connecting:', err);
-            this.updateStatus('Connection failed', 'error');
-            this.addSystemMessage('❌ Failed to connect. Please try again.');
+    leaveRoom() {
+        if (this.presenceInterval) {
+            clearInterval(this.presenceInterval);
         }
+
+        if (this.room && this.currentRoomName) {
+            this.room.get('presence').get(this.clientId).put({
+                online: false,
+                lastSeen: Date.now()
+            });
+        }
+
+        this.members.clear();
+        this.currentRoomName = null;
+        this.room = null;
     }
 
     handleIncomingMessage(data) {
+        // Skip old messages (only show messages from last 5 minutes)
+        const msgTime = new Date(data.timestamp).getTime();
+        if (Date.now() - msgTime > 5 * 60 * 1000) {
+            return;
+        }
+
         this.addMessage({
             id: data.id,
             username: data.username,
@@ -331,13 +320,15 @@ class RealtimeChat {
         const text = this.elements.messageInput.value.trim();
         if (!text) return;
 
-        if (!this.channel) {
+        if (!this.room) {
             this.addSystemMessage('Please join a room first');
             return;
         }
 
+        const msgId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
         const message = {
-            id: Math.random().toString(36).substr(2, 9),
+            id: msgId,
             username: this.username,
             senderId: this.clientId,
             text: text,
@@ -348,8 +339,8 @@ class RealtimeChat {
             timestamp: new Date().toISOString()
         };
 
-        // Publish message
-        this.channel.publish('message', message);
+        // Store in Gun
+        this.room.get('messages').get(msgId).put(message);
 
         // Clear input
         this.elements.messageInput.value = '';
@@ -487,8 +478,8 @@ class RealtimeChat {
             this.addSystemMessage(`Nickname: "${oldName}" → "${this.username}"`);
 
             // Update presence
-            if (this.presenceChannel) {
-                this.presenceChannel.presence.update({ username: this.username, color: this.getRandomColor() });
+            if (this.room) {
+                this.registerPresence();
             }
         } else if (!newName) {
             const name = prompt('Enter your new nickname:', this.username);
@@ -500,24 +491,8 @@ class RealtimeChat {
                 }
                 localStorage.setItem('chatUsername', this.username);
                 this.addSystemMessage(`Nickname: "${oldName}" → "${this.username}"`);
-
-                if (this.presenceChannel) {
-                    this.presenceChannel.presence.update({ username: this.username, color: this.getRandomColor() });
-                }
             }
         }
-    }
-
-    showTypingIndicator(username) {
-        if (!this.elements.typingIndicator || !this.elements.typingText) return;
-
-        this.elements.typingText.textContent = `${username} is typing...`;
-        this.elements.typingIndicator.style.display = 'block';
-
-        clearTimeout(this.typingTimeout);
-        this.typingTimeout = setTimeout(() => {
-            this.elements.typingIndicator.style.display = 'none';
-        }, 3000);
     }
 
     toggleMobileMenu() {
@@ -546,6 +521,6 @@ class RealtimeChat {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Starting Realtime Chat with Ably...');
+    console.log('Starting Realtime Chat with Gun.js...');
     window.chatApp = new RealtimeChat();
 });

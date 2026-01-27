@@ -10,8 +10,8 @@
     <link rel="stylesheet" href="style.css">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
-    <!-- Ably for free real-time messaging -->
-    <script src="https://cdn.ably.com/lib/ably.min-1.js"></script>
+    <!-- Gun.js for decentralized real-time sync (no API keys needed) -->
+    <script src="https://cdn.jsdelivr.net/npm/gun/gun.js"></script>
 </head>
 
 <body>
@@ -72,10 +72,6 @@
                         <span id="replyText"></span>
                     </div>
                     <button class="cancel-reply" id="cancelReply" aria-label="Cancel reply">✕</button>
-                </div>
-
-                <div class="typing-indicator" id="typingIndicator" style="display: none;">
-                    <span id="typingText">Someone is typing...</span>
                 </div>
 
                 <div class="input-area">
