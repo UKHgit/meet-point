@@ -23,6 +23,16 @@ class RealtimeChat {
         this.selectedMentionIndex = 0;
         this.mentionTriggerIndex = -1;
 
+        // Tab Title Notification
+        this.unreadMessages = 0;
+        this.originalTitle = document.title;
+        this.isTabActive = true;
+
+        // Typing Indicator
+        this.typingUsers = new Map();
+        this.lastTypingSent = 0;
+        this.typingUpdateInterval = null;
+
         this.initializeElements();
         this.bindEvents();
         this.promptUsername();
@@ -41,7 +51,8 @@ class RealtimeChat {
             'roomNameInput', 'joinRoomBtn', 'currentRoomDisplay', 'replyPreview',
             'replyUsername', 'replyText', 'cancelReply', 'changeNameBtn', 'menuToggle',
             'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus',
-            'shareLink', 'copyLinkBtn', 'mentionSuggestions'
+            'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus',
+            'shareLink', 'copyLinkBtn', 'mentionSuggestions', 'typingIndicator'
         ];
 
         ids.forEach(id => {
@@ -88,6 +99,7 @@ class RealtimeChat {
                 this.elements.messageInput.style.height = 'auto';
                 this.elements.messageInput.style.height = Math.min(this.elements.messageInput.scrollHeight, 120) + 'px';
                 this.checkMentions();
+                this.sendTyping();
             });
 
             this.elements.messageInput.addEventListener('click', () => this.checkMentions());
@@ -166,6 +178,15 @@ class RealtimeChat {
         window.addEventListener('beforeunload', () => {
             if (this.ws) {
                 this.ws.close();
+            }
+        });
+
+        // Tab Visibility
+        document.addEventListener('visibilitychange', () => {
+            this.isTabActive = !document.hidden;
+            if (this.isTabActive) {
+                this.unreadMessages = 0;
+                this.updateTitle();
             }
         });
     }
@@ -397,6 +418,16 @@ class RealtimeChat {
     }
 
     handleMessage(data) {
+        // Filter unwanted system messages
+        if (data.text) {
+            const lowerText = data.text.toLowerCase();
+            const blocked = ['hack.chat', 'patreon', 'support us', 'funny.io'];
+            if (blocked.some(k => lowerText.includes(k))) {
+                console.log('Filtered message:', data.text);
+                return;
+            }
+        }
+
         switch (data.cmd) {
             case 'onlineSet':
                 this.users = data.nicks || [];
@@ -429,7 +460,6 @@ class RealtimeChat {
                 break;
 
             case 'chat':
-                // Check for hidden commands
                 if (data.text === '__REQ_HIST__') {
                     // Start history sync logic
                     // Only reply if I have history and random chance to avoid storm
@@ -442,6 +472,11 @@ class RealtimeChat {
                 if (data.text.startsWith('__HIST_DATA__:')) {
                     this.loadHistory(data.text.substring(14));
                     return; // Don't show
+                }
+
+                if (data.text === '__TYPING__') {
+                    this.handleTyping(data.nick);
+                    return;
                 }
 
                 // Chat message
@@ -654,10 +689,31 @@ class RealtimeChat {
             }
         }
 
+        // Tab Title Notification
+        if (!isHistory && !isSent && !this.isTabActive) {
+            this.unreadMessages++;
+            this.updateTitle();
+        }
+
         const div = document.createElement('div');
         div.className = `message ${isSent ? 'sent' : 'received'}`;
         // Add fade-in animation
         div.style.animation = 'fadeIn 0.3s ease-out';
+
+        // Add Reply Button
+        const replyBtn = document.createElement('button');
+        replyBtn.className = 'reply-btn';
+        replyBtn.innerHTML = '↩'; // Or use an icon like <svg>...</svg>
+        replyBtn.title = 'Reply';
+        replyBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.replyToMessage({
+                username: data.username,
+                text: data.text,
+                timestamp: data.timestamp
+            });
+        };
+        div.appendChild(replyBtn);
 
         const content = document.createElement('div');
         content.className = 'message-content';
@@ -860,6 +916,63 @@ class RealtimeChat {
     toggleMobileMenu() {
         if (this.elements.sidebar) {
             this.elements.sidebar.classList.toggle('expanded');
+        }
+    }
+
+    updateTitle() {
+        if (this.unreadMessages > 0) {
+            document.title = `(${this.unreadMessages}) ${this.originalTitle}`;
+        } else {
+            document.title = this.originalTitle;
+        }
+    }
+
+    // Typing Indicator Logic
+    sendTyping() {
+        const now = Date.now();
+        if (now - this.lastTypingSent > 3000 && this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.lastTypingSent = now;
+            this.ws.send(JSON.stringify({
+                cmd: 'chat',
+                text: '__TYPING__'
+            }));
+        }
+    }
+
+    handleTyping(username) {
+        if (username === this.username) return;
+
+        this.typingUsers.set(username, Date.now());
+        this.updateTypingUI();
+
+        // Clear after 4 seconds if no new updates
+        setTimeout(() => {
+            const lastTime = this.typingUsers.get(username);
+            if (Date.now() - lastTime >= 4000) {
+                this.typingUsers.delete(username);
+                this.updateTypingUI();
+            }
+        }, 4100);
+    }
+
+    updateTypingUI() {
+        const indicator = this.elements.typingIndicator;
+        if (!indicator) return;
+
+        const users = Array.from(this.typingUsers.keys());
+        if (users.length === 0) {
+            indicator.style.display = 'none';
+            indicator.textContent = '';
+            return;
+        }
+
+        indicator.style.display = 'block';
+        if (users.length === 1) {
+            indicator.textContent = `${users[0]} is typing...`;
+        } else if (users.length === 2) {
+            indicator.textContent = `${users[0]} and ${users[1]} are typing...`;
+        } else {
+            indicator.textContent = `${users.length} users are typing...`;
         }
     }
 
