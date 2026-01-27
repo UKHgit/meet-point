@@ -35,56 +35,78 @@ class ChatApp {
     }
 
     bindEvents() {
-        // Message sending
-        this.elements.sendBtn.addEventListener('click', () => this.sendMessage());
-        this.elements.messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendMessage();
-            }
-        });
+        // Check if all elements exist
+        if (!this.elements.sendBtn || !this.elements.messageInput || !this.elements.username) {
+            console.error('Missing essential elements');
+            return;
+        }
 
-        // Auto-resize textarea
-        this.elements.messageInput.addEventListener('input', () => {
-            this.elements.messageInput.style.height = 'auto';
-            this.elements.messageInput.style.height = Math.min(this.elements.messageInput.scrollHeight, 120) + 'px';
-        });
+        // Message sending
+        if (this.elements.sendBtn) {
+            this.elements.sendBtn.addEventListener('click', () => this.sendMessage());
+        }
+        if (this.elements.messageInput) {
+            this.elements.messageInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendMessage();
+                }
+            });
+
+            // Auto-resize textarea
+            this.elements.messageInput.addEventListener('input', () => {
+                this.elements.messageInput.style.height = 'auto';
+                this.elements.messageInput.style.height = Math.min(this.elements.messageInput.scrollHeight, 120) + 'px';
+            });
+        }
 
         // Username change
-        this.elements.username.addEventListener('change', () => {
-            const newName = this.elements.username.value.trim();
-            if (newName && newName !== '') {
-                this.username = newName;
-                localStorage.setItem('chatUsername', this.username);
-                this.addSystemMessage(`Your name is now: ${this.username}`);
-            } else {
-                // Revert to previous name if empty
-                this.elements.username.value = this.username;
-                alert('Name cannot be empty');
-            }
-        });
+        if (this.elements.username) {
+            this.elements.username.addEventListener('change', () => {
+                const newName = this.elements.username.value.trim();
+                if (newName && newName !== '') {
+                    this.username = newName;
+                    localStorage.setItem('chatUsername', this.username);
+                    this.addSystemMessage(`Your name is now: ${this.username}`);
+                } else {
+                    // Revert to previous name if empty
+                    this.elements.username.value = this.username;
+                    alert('Name cannot be empty');
+                }
+            });
+        }
 
         // Room joining
-        this.elements.joinRoomBtn.addEventListener('click', () => this.joinRoom());
-        this.elements.roomNameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.joinRoom();
-            }
-        });
+        if (this.elements.joinRoomBtn) {
+            this.elements.joinRoomBtn.addEventListener('click', () => this.joinRoom());
+        }
+        if (this.elements.roomNameInput) {
+            this.elements.roomNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.joinRoom();
+                }
+            });
+        }
 
         // Reply handling
-        this.elements.cancelReply.addEventListener('click', () => this.cancelReply());
+        if (this.elements.cancelReply) {
+            this.elements.cancelReply.addEventListener('click', () => this.cancelReply());
+        }
         
         // Change name button
-        this.elements.changeNameBtn.addEventListener('click', () => this.changeUsername());
+        if (this.elements.changeNameBtn) {
+            this.elements.changeNameBtn.addEventListener('click', () => this.changeUsername());
+        }
         
         // Mobile menu toggle
-        this.elements.menuToggle.addEventListener('click', () => this.toggleMobileMenu());
+        if (this.elements.menuToggle) {
+            this.elements.menuToggle.addEventListener('click', () => this.toggleMobileMenu());
+        }
         
         // Close mobile menu when clicking outside
         document.addEventListener('click', (e) => {
-            if (window.innerWidth <= 768) {
-                if (!this.elements.sidebar.contains(e.target)) {
+            if (window.innerWidth <= 768 && this.elements.sidebar && this.elements.menuToggle) {
+                if (!this.elements.sidebar.contains(e.target) && !this.elements.menuToggle.contains(e.target)) {
                     this.elements.sidebar.classList.remove('expanded');
                 }
             }
@@ -92,7 +114,6 @@ class ChatApp {
         
         // Handle window resize
         window.addEventListener('resize', () => this.handleResize());
-    }
     }
 
     promptUsername() {
@@ -210,7 +231,12 @@ class ChatApp {
         }
     }
 
-    async sendMessage() {
+    async     sendMessage() {
+        if (!this.elements.messageInput) {
+            console.error('Message input not found');
+            return;
+        }
+        
         const text = this.elements.messageInput.value.trim();
         if (!text || !this.isConnected) return;
 
@@ -366,7 +392,9 @@ class ChatApp {
     }
 
     toggleMobileMenu() {
-        this.elements.sidebar.classList.toggle('expanded');
+        if (this.elements.sidebar) {
+            this.elements.sidebar.classList.toggle('expanded');
+        }
     }
 
     handleResize() {
