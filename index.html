@@ -8,6 +8,7 @@
     <meta name="theme-color" content="#8b5cf6">
     <title>Meet Point | Private Rooms</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="onboarding.css">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💬</text></svg>">
 </head>
@@ -118,7 +119,7 @@
                         <button class="emoji-tab" data-cat="travel" title="Travel">🚀</button>
                         <button class="emoji-tab" data-cat="objects" title="Objects">💡</button>
                         <button class="emoji-tab" data-cat="symbols" title="Symbols">🔣</button>
-                        <button class="emoji-tab" data-cat="flags" title="Flags">🚩</button>
+
                     </div>
                     <div id="emojiContent" class="emoji-content"></div>
                 </div>
@@ -141,6 +142,22 @@
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- Onboarding Overlay -->
+    <div id="onboardingOverlay" class="onboarding-overlay">
+        <div class="onboarding-card">
+            <button class="onboarding-skip" id="onboardingSkip">Skip</button>
+            <div class="onboarding-icon" id="onboardingIcon">👋</div>
+            <h2 id="onboardingTitle">Welcome to Meet Point!</h2>
+            <div class="step-indicator" id="stepIndicator"></div>
+            <p id="onboardingDesc">Let's take a quick tour of your new real-time chat experience.</p>
+            <div class="onboarding-footer">
+                <button class="onboarding-btn onboarding-btn-secondary" id="onboardingBack"
+                    style="display: none;">Back</button>
+                <button class="onboarding-btn onboarding-btn-primary" id="onboardingNext">Next Step</button>
+            </div>
+        </div>
     </div>
 
     <script src="script.js"></script>
