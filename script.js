@@ -25,7 +25,8 @@ class ChatApp {
             replyPreview: document.getElementById('replyPreview'),
             replyUsername: document.getElementById('replyUsername'),
             replyText: document.getElementById('replyText'),
-            cancelReply: document.getElementById('cancelReply')
+            cancelReply: document.getElementById('cancelReply'),
+            changeNameBtn: document.getElementById('changeNameBtn')
         };
     }
 
@@ -47,9 +48,15 @@ class ChatApp {
 
         // Username change
         this.elements.username.addEventListener('change', () => {
-            this.username = this.elements.username.value.trim();
-            if (this.username) {
+            const newName = this.elements.username.value.trim();
+            if (newName && newName !== '') {
+                this.username = newName;
                 localStorage.setItem('chatUsername', this.username);
+                this.addSystemMessage(`Your name is now: ${this.username}`);
+            } else {
+                // Revert to previous name if empty
+                this.elements.username.value = this.username;
+                alert('Name cannot be empty');
             }
         });
 
@@ -63,23 +70,35 @@ class ChatApp {
 
         // Reply handling
         this.elements.cancelReply.addEventListener('click', () => this.cancelReply());
+        
+        // Change name button
+        this.elements.changeNameBtn.addEventListener('click', () => this.changeUsername());
+    }
     }
 
     promptUsername() {
         const savedUsername = localStorage.getItem('chatUsername');
-        if (savedUsername) {
-            this.username = savedUsername;
-            this.elements.username.value = savedUsername;
+        if (savedUsername && savedUsername.trim()) {
+            this.username = savedUsername.trim();
+            this.elements.username.value = this.username;
         } else {
-            const name = prompt('Please enter your name:');
-            if (name) {
-                this.username = name.trim();
-                this.elements.username.value = this.username;
-                localStorage.setItem('chatUsername', this.username);
-            } else {
-                this.username = 'Anonymous';
-                this.elements.username.value = 'Anonymous';
+            // Keep asking until user enters a name
+            let name = '';
+            while (!name || !name.trim()) {
+                name = prompt('Please enter your name:');
+                if (name === null) {
+                    // User cancelled
+                    name = 'Anonymous';
+                    break;
+                }
+                if (name.trim() === '') {
+                    alert('Please enter a valid name');
+                }
             }
+            
+            this.username = name.trim();
+            this.elements.username.value = this.username;
+            localStorage.setItem('chatUsername', this.username);
         }
     }
 
@@ -175,6 +194,12 @@ class ChatApp {
     async sendMessage() {
         const text = this.elements.messageInput.value.trim();
         if (!text || !this.isConnected) return;
+
+        // Ensure we have a username
+        if (!this.username || this.username === 'Anonymous' || this.username.trim() === '') {
+            this.promptUsername();
+            return;
+        }
 
         const message = {
             type: 'message',
@@ -309,6 +334,16 @@ class ChatApp {
         this.replyingTo = null;
         this.elements.replyPreview.style.display = 'none';
         this.elements.messageInput.focus();
+    }
+
+    changeUsername() {
+        const newName = prompt('Enter your new name:', this.username);
+        if (newName !== null && newName.trim()) {
+            this.username = newName.trim();
+            this.elements.username.value = this.username;
+            localStorage.setItem('chatUsername', this.username);
+            this.addSystemMessage(`Your name is now: ${this.username}`);
+        }
     }
 
     async joinRoom() {
