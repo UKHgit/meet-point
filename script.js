@@ -51,7 +51,6 @@ class RealtimeChat {
             'roomNameInput', 'joinRoomBtn', 'currentRoomDisplay', 'replyPreview',
             'replyUsername', 'replyText', 'cancelReply', 'changeNameBtn', 'menuToggle',
             'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus',
-            'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus',
             'shareLink', 'copyLinkBtn', 'mentionSuggestions', 'typingIndicator'
         ];
 
@@ -812,20 +811,21 @@ class RealtimeChat {
                 return;
             }
 
-            // Only allow right swipe for reply
-            if (diffX > 0) {
-                currentX = x;
-                let moveX = diffX;
-                if (moveX > 100) moveX = 100 + (moveX - 100) * 0.2; // Resistance
+            // Allow both right and left swipe for reply
+            // diffX > 0 is right swipe, diffX < 0 is left swipe
+            currentX = x;
+            let moveX = diffX;
 
-                div.style.transform = `translateX(${moveX}px)`;
+            // Limit movement
+            if (Math.abs(moveX) > 100) moveX = (moveX > 0 ? 1 : -1) * (100 + (Math.abs(moveX) - 100) * 0.2);
 
-                if (moveX > 50) {
-                    div.classList.add('swiping-reply');
-                    if (window.navigator.vibrate) window.navigator.vibrate(5);
-                } else {
-                    div.classList.remove('swiping-reply');
-                }
+            div.style.transform = `translateX(${moveX}px)`;
+
+            if (Math.abs(moveX) > 50) {
+                div.classList.add('swiping-reply');
+                if (window.navigator.vibrate) window.navigator.vibrate(5);
+            } else {
+                div.classList.remove('swiping-reply');
             }
         }, { passive: true });
 
@@ -837,7 +837,7 @@ class RealtimeChat {
             div.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             div.style.transform = 'translateX(0)';
 
-            if (diffX > 60) {
+            if (Math.abs(diffX) > 60) {
                 this.replyToMessage({
                     username: data.username,
                     text: messageText,
