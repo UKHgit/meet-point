@@ -870,3 +870,44 @@ textarea:focus-visible {
 .online-user.is-me .online-user-name {
     color: var(--primary-light);
 }
+
+/* Share Link Section */
+.share-section {
+    margin-bottom: 1.5rem;
+}
+
+.share-section h3 {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.share-link-container {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.share-link-container input {
+    flex: 1;
+    padding: 0.6rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--input-bg);
+    color: var(--text-color);
+    font-size: 0.8rem;
+}
+
+.share-link-container button {
+    padding: 0.6rem 1rem;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent-color);
+    color: white;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.share-link-container button:hover {
+    background: var(--primary-color);
+}

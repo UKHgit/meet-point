@@ -1,7 +1,8 @@
 /**
  * Realtime Chat using Gun.js
- * Decentralized, no API keys needed, works on GitHub Pages!
- * Uses public Gun relay servers for cross-internet sync
+ * - Room name in URL (#roomname) for easy sharing
+ * - Decentralized, no API keys needed
+ * - Works on GitHub Pages!
  */
 
 class RealtimeChat {
@@ -20,6 +21,9 @@ class RealtimeChat {
         this.promptUsername();
         this.initGun();
 
+        // Check URL for room name and auto-join
+        this.checkUrlForRoom();
+
         console.log('Realtime Chat initialized, ID:', this.clientId);
     }
 
@@ -32,8 +36,30 @@ class RealtimeChat {
             ]
         });
 
-        this.updateStatus('Ready to connect', 'info');
+        this.updateStatus('Ready', 'info');
         console.log('Gun initialized');
+    }
+
+    checkUrlForRoom() {
+        // Check URL hash for room name (e.g., #lobby)
+        const hash = window.location.hash.slice(1); // Remove #
+        if (hash && hash.trim()) {
+            // Set the room input and auto-join
+            if (this.elements.roomNameInput) {
+                this.elements.roomNameInput.value = hash;
+            }
+            // Small delay to ensure everything is loaded
+            setTimeout(() => this.joinRoom(), 100);
+        }
+    }
+
+    updateUrlWithRoom(roomName) {
+        // Update URL hash without reloading page
+        if (roomName) {
+            window.history.replaceState(null, '', '#' + roomName);
+        } else {
+            window.history.replaceState(null, '', window.location.pathname);
+        }
     }
 
     initializeElements() {
@@ -43,7 +69,8 @@ class RealtimeChat {
             'messages', 'messageInput', 'sendBtn', 'username', 'userCount',
             'roomNameInput', 'joinRoomBtn', 'currentRoomDisplay', 'replyPreview',
             'replyUsername', 'replyText', 'cancelReply', 'changeNameBtn', 'menuToggle',
-            'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus'
+            'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus',
+            'shareLink', 'copyLinkBtn'
         ];
 
         elementIds.forEach(id => {
@@ -121,6 +148,13 @@ class RealtimeChat {
             });
         }
 
+        if (this.elements.copyLinkBtn) {
+            this.elements.copyLinkBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.copyShareLink();
+            });
+        }
+
         document.addEventListener('click', (e) => {
             if (window.innerWidth <= 768 && this.elements.sidebar && this.elements.menuToggle) {
                 if (!this.elements.sidebar.contains(e.target) && !this.elements.menuToggle.contains(e.target)) {
@@ -130,6 +164,11 @@ class RealtimeChat {
         });
 
         window.addEventListener('resize', () => this.handleResize());
+
+        // Handle browser back/forward with hash changes
+        window.addEventListener('hashchange', () => {
+            this.checkUrlForRoom();
+        });
 
         window.addEventListener('beforeunload', () => {
             if (this.currentRoomName) {
@@ -183,6 +222,15 @@ class RealtimeChat {
         this.currentRoomName = roomName;
         this.seenMessages.clear();
 
+        // Update URL with room name
+        this.updateUrlWithRoom(roomName);
+
+        // Update share link display
+        if (this.elements.shareLink) {
+            const shareUrl = window.location.origin + window.location.pathname + '#' + roomName;
+            this.elements.shareLink.value = shareUrl;
+        }
+
         if (this.elements.currentRoomDisplay) {
             this.elements.currentRoomDisplay.textContent = roomName;
         }
@@ -229,7 +277,27 @@ class RealtimeChat {
 
         this.updateStatus('Connected', 'connected');
         this.addSystemMessage(`You joined "${roomName}" as ${this.username}`);
-        this.addSystemMessage('💡 Share this room name with others to chat!');
+        this.addSystemMessage('📎 Share this page URL to invite others!');
+    }
+
+    copyShareLink() {
+        if (!this.currentRoomName) {
+            this.addSystemMessage('Join a room first to get a share link');
+            return;
+        }
+
+        const shareUrl = window.location.origin + window.location.pathname + '#' + this.currentRoomName;
+
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            this.addSystemMessage('✅ Link copied to clipboard!');
+        }).catch(() => {
+            // Fallback for older browsers
+            if (this.elements.shareLink) {
+                this.elements.shareLink.select();
+                document.execCommand('copy');
+                this.addSystemMessage('✅ Link copied to clipboard!');
+            }
+        });
     }
 
     registerPresence() {
@@ -477,7 +545,6 @@ class RealtimeChat {
             localStorage.setItem('chatUsername', this.username);
             this.addSystemMessage(`Nickname: "${oldName}" → "${this.username}"`);
 
-            // Update presence
             if (this.room) {
                 this.registerPresence();
             }
