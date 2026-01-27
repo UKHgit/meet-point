@@ -198,23 +198,50 @@ class ChatApp {
         // Check if we're on Netlify (no WebSocket support on free tier)
         if (window.location.hostname.includes('netlify.app') || window.location.hostname.includes('netlify.com')) {
             this.connectNetlify();
+        } else if (window.location.protocol === 'file:' || window.location.port === '8000') {
+            // Static server mode - use HTTP polling
+            this.connectStatic();
         } else {
             this.connectWebSocket();
         }
     }
 
-    connectWebSocket() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}`;
+    connectStatic() {
+        // Static server mode - use HTTP polling
+        this.isConnected = true;
+        this.addSystemMessage('Connected to chat server (HTTP mode)');
+        if (this.elements.sendBtn) {
+            this.elements.sendBtn.disabled = false;
+        }
         
-        this.socket = new WebSocket(wsUrl);
+        // Send username to server
+        if (this.username && this.username !== 'Anonymous') {
+            // Send username update to server
+            this.sendStaticUpdate({
+                type: 'username',
+                username: this.username
+            });
+        }
+        
+        // Start polling for messages
+        this.startPolling();
+    }
 
-        this.socket.onopen = () => {
-            this.isConnected = true;
-            this.addSystemMessage('Connected to chat server');
-            if (this.elements.sendBtn) {
-                this.elements.sendBtn.disabled = false;
-            }
+    sendStaticUpdate(data) {
+        // Send update to server via HTTP POST
+        fetch('/api/update', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                ...data,
+                room: this.currentRoom
+            })
+        }).catch(error => {
+            console.error('Failed to send update:', error);
+        });
+    }
             
             // Send username to server
             if (this.username && this.username !== 'Anonymous') {
@@ -351,8 +378,9 @@ class ChatApp {
             if (this.socket) {
                 this.socket.send(JSON.stringify(message));
             } else {
-                // Use Netlify Functions
-                const response = await fetch('/.netlify/functions/chat', {
+                // Use HTTP POST for static server or Netlify
+                const endpoint = window.location.port === '8000' ? '/api/message' : '/.netlify/functions/chat';
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
