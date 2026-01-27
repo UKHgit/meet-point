@@ -280,12 +280,6 @@ class RealtimeChat {
                 }));
 
                 this.startPing();
-
-                // Request history from other peers
-                // Delay slightly to ensure join is processed
-                setTimeout(() => {
-                    this.requestHistory();
-                }, 1000);
             };
 
             this.ws.onmessage = (event) => {
@@ -400,32 +394,32 @@ class RealtimeChat {
     handleMessage(data) {
         switch (data.cmd) {
             case 'onlineSet':
-                this.users = [...new Set(data.nicks || [])];
+                this.users = data.nicks || [];
                 this.updateUserList();
                 this.updateStatus('Connected', 'connected');
                 this.addSystemMessage(`You joined "${this.currentRoom}" as ${this.username}`);
                 this.addSystemMessage('📎 Share this page URL to invite others!');
+
+                // Safe to request history now that we are joined
+                setTimeout(() => this.requestHistory(), 1000);
                 break;
 
             case 'onlineAdd':
                 if (data.nick) {
-                    if (!this.users.includes(data.nick)) {
-                        this.users.push(data.nick);
-                        this.updateUserList();
-                        this.addSystemMessage(`${data.nick} joined`);
-
-                        // If new user joins, maybe share history?
-                        // But protocol is PUBLIC. If everyone sends history, it's a mess.
-                        // Better to wait for them to REQUEST it via __REQ_HIST__
-                    }
+                    this.users.push(data.nick);
+                    this.updateUserList();
+                    this.addSystemMessage(`${data.nick} joined`);
                 }
                 break;
 
             case 'onlineRemove':
                 if (data.nick) {
-                    this.users = this.users.filter(u => u !== data.nick);
-                    this.updateUserList();
-                    this.addSystemMessage(`${data.nick} left`);
+                    const index = this.users.indexOf(data.nick);
+                    if (index > -1) {
+                        this.users.splice(index, 1);
+                        this.updateUserList();
+                        this.addSystemMessage(`${data.nick} left`);
+                    }
                 }
                 break;
 
