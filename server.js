@@ -109,8 +109,11 @@ class ChatServer {
                 rooms: Array.from(this.rooms.keys())
             });
             
-            // Auto-join general room
-            this.joinRoom(client, 'general');
+            // Don't auto-join - wait for user to join manually
+            this.sendToClient(client, {
+                type: 'system',
+                text: 'Please join a room to start chatting'
+            });
         });
     }
 

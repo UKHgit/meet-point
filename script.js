@@ -73,9 +73,18 @@ class ChatApp {
             this.elements.username.addEventListener('change', () => {
                 const newName = this.elements.username.value.trim();
                 if (newName && newName !== '') {
+                    const oldUsername = this.username;
                     this.username = newName;
                     localStorage.setItem('chatUsername', this.username);
                     this.addSystemMessage(`Your name is now: ${this.username}`);
+                    
+                    // Send username update to server
+                    if (this.socket && this.isConnected) {
+                        this.socket.send(JSON.stringify({
+                            type: 'username',
+                            username: this.username
+                        }));
+                    }
                 } else {
                     // Revert to previous name if empty
                     this.elements.username.value = this.username;
@@ -184,6 +193,15 @@ class ChatApp {
             if (this.elements.sendBtn) {
                 this.elements.sendBtn.disabled = false;
             }
+            
+            // Send username to server
+            if (this.username && this.username !== 'Anonymous') {
+                this.socket.send(JSON.stringify({
+                    type: 'username',
+                    username: this.username
+                }));
+            }
+            
             this.joinRoom(this.currentRoom);
         };
 
@@ -273,7 +291,9 @@ class ChatApp {
         }
 
         // Ensure we have a username
-        if (!this.username || this.username === 'Anonymous' || this.username.trim() === '') {
+        console.log('Current username:', this.username);
+        if (!this.username || this.username.trim() === '') {
+            console.log('No username, prompting...');
             this.promptUsername();
             return;
         }
@@ -322,6 +342,8 @@ class ChatApp {
     }
 
     addMessage(data) {
+        console.log('Adding message:', data);
+        console.log('Current username:', this.username);
         const isSent = data.username === this.username;
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
