@@ -1148,19 +1148,30 @@ class RealtimeChat {
     }
 
     async uploadToImgBB(file) {
-        const apiKey = '5bb25da16b6754021200388d22797e88'; // Publicly available demo key or user-provided
+        console.log('Attempting upload to ImgBB:', file.name, file.size);
+        const apiKey = '5bb25da16b6754021200388d22797e88'; // Publicly available demo key
         const formData = new FormData();
         formData.append('image', file);
 
-        const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-            method: 'POST',
-            body: formData
-        });
+        try {
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+                method: 'POST',
+                body: formData
+            });
 
-        if (!response.ok) throw new Error('Upload failed');
+            const data = await response.json();
 
-        const data = await response.json();
-        return data.data.url;
+            if (!response.ok) {
+                console.error('ImgBB API error response:', data);
+                throw new Error(data.error ? data.error.message : 'Upload failed');
+            }
+
+            console.log('ImgBB upload successful:', data.data.url);
+            return data.data.url;
+        } catch (error) {
+            console.error('Fetch error during ImgBB upload:', error);
+            throw error;
+        }
     }
 
     sendImage(url) {

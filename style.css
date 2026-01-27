@@ -1154,18 +1154,25 @@ body {
 
     .input-area {
         padding: 0.5rem;
-        gap: 0.25rem;
+        gap: 0.5rem;
+        flex-wrap: nowrap;
+        width: 100%;
     }
 
     #messageInput {
-        padding: 0.6rem 0.5rem;
+        padding: 0.6rem 0.75rem;
         font-size: 16px;
         border-radius: 20px;
+        flex: 1;
+        min-width: 0;
+        /* Allow input to shrink properly */
     }
 
     #sendBtn {
         width: 44px;
         height: 44px;
+        min-width: 44px;
+        /* Prevent shrinking */
         flex-shrink: 0;
     }
 
