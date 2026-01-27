@@ -1,71 +1,36 @@
 /**
- * Realtime Chat using Gun.js
- * - Room name in URL (#roomname) for easy sharing
- * - Decentralized, no API keys needed
- * - Works on GitHub Pages!
+ * Realtime Chat - hack.chat style
+ * Uses hack.chat's public WebSocket server for real-time messaging
+ * Room name in URL for easy sharing
  */
+
+// hack.chat WebSocket server
+const WS_URL = 'wss://hack.chat/chat-ws';
 
 class RealtimeChat {
     constructor() {
-        this.gun = null;
-        this.room = null;
+        this.ws = null;
         this.username = '';
-        this.currentRoomName = null;
-        this.clientId = 'user-' + Math.random().toString(36).substr(2, 9);
+        this.currentRoom = null;
         this.replyingTo = null;
-        this.seenMessages = new Set();
-        this.members = new Map();
+        this.users = [];
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
 
         this.initializeElements();
         this.bindEvents();
         this.promptUsername();
-        this.initGun();
 
-        // Check URL for room name and auto-join
+        // Check URL for room and auto-join
         this.checkUrlForRoom();
 
-        console.log('Realtime Chat initialized, ID:', this.clientId);
-    }
-
-    initGun() {
-        // Initialize Gun with public relay servers
-        this.gun = Gun({
-            peers: [
-                'https://gun-manhattan.herokuapp.com/gun',
-                'https://gun-us.herokuapp.com/gun'
-            ]
-        });
-
-        this.updateStatus('Ready', 'info');
-        console.log('Gun initialized');
-    }
-
-    checkUrlForRoom() {
-        // Check URL hash for room name (e.g., #lobby)
-        const hash = window.location.hash.slice(1); // Remove #
-        if (hash && hash.trim()) {
-            // Set the room input and auto-join
-            if (this.elements.roomNameInput) {
-                this.elements.roomNameInput.value = hash;
-            }
-            // Small delay to ensure everything is loaded
-            setTimeout(() => this.joinRoom(), 100);
-        }
-    }
-
-    updateUrlWithRoom(roomName) {
-        // Update URL hash without reloading page
-        if (roomName) {
-            window.history.replaceState(null, '', '#' + roomName);
-        } else {
-            window.history.replaceState(null, '', window.location.pathname);
-        }
+        console.log('Chat initialized');
     }
 
     initializeElements() {
         this.elements = {};
 
-        const elementIds = [
+        const ids = [
             'messages', 'messageInput', 'sendBtn', 'username', 'userCount',
             'roomNameInput', 'joinRoomBtn', 'currentRoomDisplay', 'replyPreview',
             'replyUsername', 'replyText', 'cancelReply', 'changeNameBtn', 'menuToggle',
@@ -73,7 +38,7 @@ class RealtimeChat {
             'shareLink', 'copyLinkBtn'
         ];
 
-        elementIds.forEach(id => {
+        ids.forEach(id => {
             this.elements[id] = document.getElementById(id);
         });
 
@@ -81,11 +46,9 @@ class RealtimeChat {
     }
 
     bindEvents() {
+        // Send message
         if (this.elements.sendBtn) {
-            this.elements.sendBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.sendMessage();
-            });
+            this.elements.sendBtn.addEventListener('click', () => this.sendMessage());
         }
 
         if (this.elements.messageInput) {
@@ -102,27 +65,9 @@ class RealtimeChat {
             });
         }
 
-        if (this.elements.changeNameBtn) {
-            this.elements.changeNameBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.changeUsername();
-            });
-        }
-
-        if (this.elements.username) {
-            this.elements.username.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
-                    this.changeUsername();
-                }
-            });
-        }
-
+        // Join room
         if (this.elements.joinRoomBtn) {
-            this.elements.joinRoomBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.joinRoom();
-            });
+            this.elements.joinRoomBtn.addEventListener('click', () => this.joinRoom());
         }
 
         if (this.elements.roomNameInput) {
@@ -134,25 +79,33 @@ class RealtimeChat {
             });
         }
 
+        // Username change
+        if (this.elements.changeNameBtn) {
+            this.elements.changeNameBtn.addEventListener('click', () => this.changeUsername());
+        }
+
+        if (this.elements.username) {
+            this.elements.username.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.changeUsername();
+                }
+            });
+        }
+
+        // Reply
         if (this.elements.cancelReply) {
-            this.elements.cancelReply.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.cancelReply();
-            });
+            this.elements.cancelReply.addEventListener('click', () => this.cancelReply());
         }
 
-        if (this.elements.menuToggle) {
-            this.elements.menuToggle.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.toggleMobileMenu();
-            });
-        }
-
+        // Copy link
         if (this.elements.copyLinkBtn) {
-            this.elements.copyLinkBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.copyShareLink();
-            });
+            this.elements.copyLinkBtn.addEventListener('click', () => this.copyShareLink());
+        }
+
+        // Mobile menu
+        if (this.elements.menuToggle) {
+            this.elements.menuToggle.addEventListener('click', () => this.toggleMobileMenu());
         }
 
         document.addEventListener('click', (e) => {
@@ -163,37 +116,56 @@ class RealtimeChat {
             }
         });
 
-        window.addEventListener('resize', () => this.handleResize());
-
-        // Handle browser back/forward with hash changes
-        window.addEventListener('hashchange', () => {
-            this.checkUrlForRoom();
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768 && this.elements.sidebar) {
+                this.elements.sidebar.classList.remove('expanded');
+            }
         });
 
+        // URL hash change
+        window.addEventListener('hashchange', () => this.checkUrlForRoom());
+
+        // Cleanup
         window.addEventListener('beforeunload', () => {
-            if (this.currentRoomName) {
-                this.leaveRoom();
+            if (this.ws) {
+                this.ws.close();
             }
         });
     }
 
-    promptUsername() {
-        const savedUsername = localStorage.getItem('chatUsername');
-        if (savedUsername && savedUsername.trim()) {
-            this.username = savedUsername.trim();
-            if (this.elements.username) {
-                this.elements.username.value = this.username;
+    checkUrlForRoom() {
+        const hash = window.location.hash.slice(1);
+        if (hash && hash.trim()) {
+            if (this.elements.roomNameInput) {
+                this.elements.roomNameInput.value = hash;
             }
+            setTimeout(() => this.joinRoom(), 100);
+        }
+    }
+
+    updateUrl(room) {
+        if (room) {
+            window.history.replaceState(null, '', '#' + room);
         } else {
-            let name = prompt('Please enter your nickname:');
-            if (name === null || name.trim() === '') {
-                name = 'User' + Math.random().toString(36).substr(2, 4);
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+    }
+
+    promptUsername() {
+        const saved = localStorage.getItem('chatUsername');
+        if (saved && saved.trim()) {
+            this.username = saved.trim();
+        } else {
+            let name = prompt('Enter your nickname:');
+            if (!name || !name.trim()) {
+                name = 'User_' + Math.random().toString(36).substr(2, 4);
             }
             this.username = name.trim();
-            if (this.elements.username) {
-                this.elements.username.value = this.username;
-            }
             localStorage.setItem('chatUsername', this.username);
+        }
+
+        if (this.elements.username) {
+            this.elements.username.value = this.username;
         }
     }
 
@@ -205,214 +177,215 @@ class RealtimeChat {
     }
 
     joinRoom() {
-        const roomInput = this.elements.roomNameInput;
-        if (!roomInput) return;
+        const input = this.elements.roomNameInput;
+        if (!input) return;
 
-        const roomName = roomInput.value.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
-        if (!roomName) {
-            this.addSystemMessage('Please enter a valid room name');
+        let room = input.value.trim();
+        if (!room) {
+            this.addSystemMessage('Please enter a room name');
             return;
         }
 
-        // Leave current room
-        if (this.currentRoomName) {
-            this.leaveRoom();
+        // Sanitize room name (hack.chat style - prefix with ? is optional)
+        room = room.replace(/^\?/, '');
+
+        // Close existing connection
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
         }
 
-        this.currentRoomName = roomName;
-        this.seenMessages.clear();
+        this.currentRoom = room;
+        this.users = [];
+        this.reconnectAttempts = 0;
 
-        // Update URL with room name
-        this.updateUrlWithRoom(roomName);
-
-        // Update share link display
-        if (this.elements.shareLink) {
-            const shareUrl = window.location.origin + window.location.pathname + '#' + roomName;
-            this.elements.shareLink.value = shareUrl;
-        }
+        // Update UI
+        this.updateUrl(room);
+        this.clearMessages();
 
         if (this.elements.currentRoomDisplay) {
-            this.elements.currentRoomDisplay.textContent = roomName;
+            this.elements.currentRoomDisplay.textContent = room;
         }
         if (this.elements.mobileTitle) {
-            this.elements.mobileTitle.textContent = roomName;
+            this.elements.mobileTitle.textContent = room;
         }
         if (this.elements.roomName) {
-            this.elements.roomName.textContent = roomName;
+            this.elements.roomName.textContent = room;
+        }
+        if (this.elements.shareLink) {
+            this.elements.shareLink.value = window.location.origin + window.location.pathname + '#' + room;
         }
 
-        roomInput.value = '';
-        this.clearMessages();
+        input.value = '';
 
         if (window.innerWidth <= 768 && this.elements.sidebar) {
             this.elements.sidebar.classList.remove('expanded');
         }
 
         this.updateStatus('Connecting...', 'connecting');
-        this.addSystemMessage(`Joining room "${roomName}"...`);
+        this.addSystemMessage(`Joining room "${room}"...`);
 
-        // Get room reference
-        this.room = this.gun.get('chat-room-' + roomName);
-
-        // Subscribe to messages
-        this.room.get('messages').map().on((data, key) => {
-            if (data && !this.seenMessages.has(key)) {
-                this.seenMessages.add(key);
-                this.handleIncomingMessage(data);
-            }
-        });
-
-        // Register presence
-        this.registerPresence();
-
-        // Subscribe to presence
-        this.room.get('presence').map().on((data, key) => {
-            if (data && data.online && Date.now() - data.lastSeen < 30000) {
-                this.members.set(key, data);
-            } else {
-                this.members.delete(key);
-            }
-            this.updateMemberList();
-        });
-
-        this.updateStatus('Connected', 'connected');
-        this.addSystemMessage(`You joined "${roomName}" as ${this.username}`);
-        this.addSystemMessage('📎 Share this page URL to invite others!');
+        // Connect to hack.chat WebSocket
+        this.connect();
     }
 
-    copyShareLink() {
-        if (!this.currentRoomName) {
-            this.addSystemMessage('Join a room first to get a share link');
-            return;
+    connect() {
+        try {
+            this.ws = new WebSocket(WS_URL);
+
+            this.ws.onopen = () => {
+                console.log('WebSocket connected');
+                this.reconnectAttempts = 0;
+
+                // Join room (hack.chat protocol)
+                this.ws.send(JSON.stringify({
+                    cmd: 'join',
+                    channel: this.currentRoom,
+                    nick: this.username
+                }));
+            };
+
+            this.ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    this.handleMessage(data);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
+
+            this.ws.onclose = () => {
+                console.log('WebSocket closed');
+                this.updateStatus('Disconnected', 'error');
+
+                // Try to reconnect
+                if (this.currentRoom && this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    this.addSystemMessage(`Connection lost. Reconnecting (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+                    setTimeout(() => this.connect(), 3000);
+                }
+            };
+
+            this.ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.updateStatus('Connection error', 'error');
+            };
+
+        } catch (e) {
+            console.error('Failed to connect:', e);
+            this.updateStatus('Connection failed', 'error');
+            this.addSystemMessage('❌ Failed to connect. Please try again.');
         }
-
-        const shareUrl = window.location.origin + window.location.pathname + '#' + this.currentRoomName;
-
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            this.addSystemMessage('✅ Link copied to clipboard!');
-        }).catch(() => {
-            // Fallback for older browsers
-            if (this.elements.shareLink) {
-                this.elements.shareLink.select();
-                document.execCommand('copy');
-                this.addSystemMessage('✅ Link copied to clipboard!');
-            }
-        });
     }
 
-    registerPresence() {
-        if (!this.room || !this.currentRoomName) return;
+    handleMessage(data) {
+        switch (data.cmd) {
+            case 'onlineSet':
+                // Initial user list when joining
+                this.users = data.nicks || [];
+                this.updateUserList();
+                this.updateStatus('Connected', 'connected');
+                this.addSystemMessage(`You joined "${this.currentRoom}" as ${this.username}`);
+                this.addSystemMessage('📎 Share this page URL to invite others!');
+                break;
 
-        const updatePresence = () => {
-            this.room.get('presence').get(this.clientId).put({
-                username: this.username,
-                color: this.getRandomColor(),
-                lastSeen: Date.now(),
-                online: true
-            });
-        };
+            case 'onlineAdd':
+                // User joined
+                if (data.nick && !this.users.includes(data.nick)) {
+                    this.users.push(data.nick);
+                    this.updateUserList();
+                    this.addSystemMessage(`${data.nick} joined the room`);
+                }
+                break;
 
-        updatePresence();
+            case 'onlineRemove':
+                // User left
+                if (data.nick) {
+                    this.users = this.users.filter(u => u !== data.nick);
+                    this.updateUserList();
+                    this.addSystemMessage(`${data.nick} left the room`);
+                }
+                break;
 
-        // Update presence every 10 seconds
-        this.presenceInterval = setInterval(updatePresence, 10000);
-    }
+            case 'chat':
+                // Chat message
+                this.addMessage({
+                    username: data.nick || 'Anonymous',
+                    text: data.text || '',
+                    timestamp: data.time ? new Date(data.time) : new Date(),
+                    trip: data.trip
+                }, data.nick === this.username);
+                break;
 
-    leaveRoom() {
-        if (this.presenceInterval) {
-            clearInterval(this.presenceInterval);
+            case 'info':
+                // Info message from server
+                this.addSystemMessage(data.text || 'Info');
+                break;
+
+            case 'warn':
+                // Warning from server
+                this.addSystemMessage('⚠️ ' + (data.text || 'Warning'));
+                break;
+
+            case 'emote':
+                // Emote/action
+                this.addSystemMessage(`* ${data.nick} ${data.text}`);
+                break;
+
+            default:
+                console.log('Unknown message:', data);
         }
-
-        if (this.room && this.currentRoomName) {
-            this.room.get('presence').get(this.clientId).put({
-                online: false,
-                lastSeen: Date.now()
-            });
-        }
-
-        this.members.clear();
-        this.currentRoomName = null;
-        this.room = null;
     }
 
-    handleIncomingMessage(data) {
-        // Skip old messages (only show messages from last 5 minutes)
-        const msgTime = new Date(data.timestamp).getTime();
-        if (Date.now() - msgTime > 5 * 60 * 1000) {
-            return;
-        }
-
-        this.addMessage({
-            id: data.id,
-            username: data.username,
-            text: data.text,
-            replyTo: data.replyTo,
-            timestamp: data.timestamp,
-            senderId: data.senderId
-        }, data.senderId === this.clientId);
-    }
-
-    updateMemberList() {
-        const count = this.members.size;
-        const userText = `${count} user${count !== 1 ? 's' : ''}`;
+    updateUserList() {
+        const count = this.users.length;
+        const text = `${count} user${count !== 1 ? 's' : ''}`;
 
         if (this.elements.userCount) {
-            this.elements.userCount.textContent = userText;
+            this.elements.userCount.textContent = text;
         }
         if (this.elements.mobileUsers) {
-            this.elements.mobileUsers.textContent = userText;
+            this.elements.mobileUsers.textContent = text;
         }
 
         if (this.elements.onlineUsersList) {
             if (count === 0) {
                 this.elements.onlineUsersList.innerHTML = '<div class="no-users">No users online</div>';
             } else {
-                let html = '';
-                this.members.forEach((data, id) => {
-                    const isMe = id === this.clientId;
-                    html += `
-                        <div class="online-user ${isMe ? 'is-me' : ''}" data-id="${id}">
-                            <span class="online-user-status" style="color: ${data.color || '#10b981'}">●</span>
-                            <span class="online-user-name">${this.escapeHtml(data.username)}${isMe ? ' (you)' : ''}</span>
+                this.elements.onlineUsersList.innerHTML = this.users.map(nick => {
+                    const isMe = nick === this.username;
+                    return `
+                        <div class="online-user ${isMe ? 'is-me' : ''}">
+                            <span class="online-user-status">●</span>
+                            <span class="online-user-name">${this.escapeHtml(nick)}${isMe ? ' (you)' : ''}</span>
                         </div>
                     `;
-                });
-                this.elements.onlineUsersList.innerHTML = html;
+                }).join('');
             }
         }
     }
 
     sendMessage() {
-        if (!this.elements.messageInput) return;
+        const input = this.elements.messageInput;
+        if (!input) return;
 
-        const text = this.elements.messageInput.value.trim();
+        const text = input.value.trim();
         if (!text) return;
 
-        if (!this.room) {
-            this.addSystemMessage('Please join a room first');
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            this.addSystemMessage('Not connected. Please join a room first.');
             return;
         }
 
-        const msgId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-
-        const message = {
-            id: msgId,
-            username: this.username,
-            senderId: this.clientId,
-            text: text,
-            replyTo: this.replyingTo ? {
-                username: this.replyingTo.username,
-                text: this.replyingTo.text.substring(0, 100)
-            } : null,
-            timestamp: new Date().toISOString()
-        };
-
-        // Store in Gun
-        this.room.get('messages').get(msgId).put(message);
+        // Send message (hack.chat protocol)
+        this.ws.send(JSON.stringify({
+            cmd: 'chat',
+            text: text
+        }));
 
         // Clear input
-        this.elements.messageInput.value = '';
-        this.elements.messageInput.style.height = 'auto';
+        input.value = '';
+        input.style.height = 'auto';
 
         // Clear reply
         this.replyingTo = null;
@@ -422,15 +395,10 @@ class RealtimeChat {
     }
 
     addMessage(data, isSent) {
-        // Check for duplicate
-        const existing = document.querySelector(`[data-message-id="${data.id}"]`);
-        if (existing) return;
+        const div = document.createElement('div');
+        div.className = `message ${isSent ? 'sent' : 'received'}`;
 
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
-        messageDiv.dataset.messageId = data.id;
-
-        messageDiv.onclick = (e) => {
+        div.onclick = (e) => {
             if (e.target.closest('.message-text') || e.target.closest('.message-username')) {
                 this.replyToMessage(data);
             }
@@ -439,22 +407,15 @@ class RealtimeChat {
         const content = document.createElement('div');
         content.className = 'message-content';
 
-        if (data.replyTo && data.replyTo.username) {
-            const replyDiv = document.createElement('div');
-            replyDiv.className = 'message-reply';
-            replyDiv.innerHTML = `
-                <span class="reply-tag">↩ @${this.escapeHtml(data.replyTo.username)}</span>
-                <span class="reply-text">${this.escapeHtml(data.replyTo.text)}</span>
-            `;
-            content.appendChild(replyDiv);
-        }
-
         const header = document.createElement('div');
         header.className = 'message-header';
 
         const username = document.createElement('span');
         username.className = 'message-username';
         username.textContent = data.username;
+        if (data.trip) {
+            username.title = 'Trip: ' + data.trip;
+        }
 
         const time = document.createElement('span');
         time.className = 'message-time';
@@ -479,21 +440,21 @@ class RealtimeChat {
             content.appendChild(sentTime);
         }
 
-        messageDiv.appendChild(content);
+        div.appendChild(content);
 
         if (this.elements.messages) {
-            this.elements.messages.appendChild(messageDiv);
+            this.elements.messages.appendChild(div);
             this.scrollToBottom();
         }
     }
 
     addSystemMessage(text) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'system-message';
-        messageDiv.innerHTML = `<span class="system-icon">ℹ️</span> ${this.escapeHtml(text)}`;
+        const div = document.createElement('div');
+        div.className = 'system-message';
+        div.innerHTML = `<span class="system-icon">ℹ️</span> ${this.escapeHtml(text)}`;
 
         if (this.elements.messages) {
-            this.elements.messages.appendChild(messageDiv);
+            this.elements.messages.appendChild(div);
             this.scrollToBottom();
         }
     }
@@ -521,7 +482,10 @@ class RealtimeChat {
         if (this.elements.replyText) {
             this.elements.replyText.textContent = message.text.substring(0, 100);
         }
+
+        // Add @mention to input
         if (this.elements.messageInput) {
+            this.elements.messageInput.value = `@${message.username} `;
             this.elements.messageInput.focus();
         }
     }
@@ -532,51 +496,61 @@ class RealtimeChat {
             this.elements.replyPreview.style.display = 'none';
         }
         if (this.elements.messageInput) {
+            this.elements.messageInput.value = '';
             this.elements.messageInput.focus();
         }
     }
 
     changeUsername() {
-        const newName = this.elements.username ? this.elements.username.value.trim() : '';
+        const input = this.elements.username;
+        let newName = input ? input.value.trim() : '';
+
+        if (!newName) {
+            newName = prompt('Enter your new nickname:', this.username);
+        }
 
         if (newName && newName !== this.username) {
             const oldName = this.username;
             this.username = newName;
             localStorage.setItem('chatUsername', this.username);
-            this.addSystemMessage(`Nickname: "${oldName}" → "${this.username}"`);
 
-            if (this.room) {
-                this.registerPresence();
+            if (input) {
+                input.value = this.username;
             }
-        } else if (!newName) {
-            const name = prompt('Enter your new nickname:', this.username);
-            if (name && name.trim()) {
-                const oldName = this.username;
-                this.username = name.trim();
-                if (this.elements.username) {
-                    this.elements.username.value = this.username;
-                }
-                localStorage.setItem('chatUsername', this.username);
-                this.addSystemMessage(`Nickname: "${oldName}" → "${this.username}"`);
+
+            // Rejoin room with new name
+            if (this.currentRoom && this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.close();
+                setTimeout(() => this.connect(), 500);
             }
+
+            this.addSystemMessage(`Nickname changed: ${oldName} → ${this.username}`);
         }
+    }
+
+    copyShareLink() {
+        if (!this.currentRoom) {
+            this.addSystemMessage('Join a room first to get a share link');
+            return;
+        }
+
+        const url = window.location.origin + window.location.pathname + '#' + this.currentRoom;
+
+        navigator.clipboard.writeText(url).then(() => {
+            this.addSystemMessage('✅ Link copied!');
+        }).catch(() => {
+            if (this.elements.shareLink) {
+                this.elements.shareLink.select();
+                document.execCommand('copy');
+                this.addSystemMessage('✅ Link copied!');
+            }
+        });
     }
 
     toggleMobileMenu() {
         if (this.elements.sidebar) {
             this.elements.sidebar.classList.toggle('expanded');
         }
-    }
-
-    handleResize() {
-        if (window.innerWidth > 768 && this.elements.sidebar) {
-            this.elements.sidebar.classList.remove('expanded');
-        }
-    }
-
-    getRandomColor() {
-        const colors = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#6366f1'];
-        return colors[Math.floor(Math.random() * colors.length)];
     }
 
     escapeHtml(text) {
@@ -588,6 +562,6 @@ class RealtimeChat {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('Starting Realtime Chat with Gun.js...');
+    console.log('Starting Chat...');
     window.chatApp = new RealtimeChat();
 });
