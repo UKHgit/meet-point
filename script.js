@@ -35,6 +35,7 @@ class RealtimeChat {
 
         this.initializeElements();
         this.bindEvents();
+        this.initTheme();
         this.promptUsername();
 
         // Check URL for room and auto-join
@@ -52,7 +53,7 @@ class RealtimeChat {
             'replyUsername', 'replyText', 'cancelReply', 'changeNameBtn', 'menuToggle',
             'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus',
             'shareLink', 'copyLinkBtn', 'mentionSuggestions', 'typingIndicator',
-            'emojiPicker', 'emojiBtn', 'attachBtn', 'imageInput'
+            'emojiPicker', 'emojiBtn', 'attachBtn', 'imageInput', 'emojiContent'
         ];
 
         ids.forEach(id => {
@@ -167,6 +168,22 @@ class RealtimeChat {
                 this.toggleEmojiPicker();
             });
         }
+
+        // Theme Selection Buttons
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const theme = btn.dataset.theme;
+                this.setTheme(theme);
+            });
+        });
+
+        // Emoji Tab switching
+        document.querySelectorAll('.emoji-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.changeEmojiCategory(tab.dataset.cat);
+            });
+        });
 
         document.addEventListener('click', (e) => {
             if (this.elements.emojiPicker && !this.elements.emojiPicker.contains(e.target) && e.target !== this.elements.emojiBtn) {
@@ -1086,6 +1103,28 @@ class RealtimeChat {
         }
     }
 
+    // Theme Logic
+    setTheme(themeName) {
+        // Remove all theme classes
+        document.body.classList.remove('theme-whatsapp-dark', 'theme-whatsapp-light', 'theme-ocean', 'theme-emerald', 'theme-crimson', 'theme-midnight');
+
+        if (themeName !== 'default') {
+            document.body.classList.add(`theme-${themeName}`);
+        }
+
+        // Update active state in UI
+        document.querySelectorAll('.theme-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.theme === themeName);
+        });
+
+        localStorage.setItem('chat_theme', themeName);
+    }
+
+    initTheme() {
+        const savedTheme = localStorage.getItem('chat_theme') || 'default';
+        this.setTheme(savedTheme);
+    }
+
     // Image Handling Logic
     async handleImageSelect(event) {
         const file = event.target.files[0];
@@ -1097,101 +1136,108 @@ class RealtimeChat {
         }
 
         try {
-            const base64 = await this.compressImage(file);
-            this.sendImage(base64);
+            this.addSystemMessage('Uploading image...');
+            const imageUrl = await this.uploadToImgBB(file);
+            this.sendImage(imageUrl);
         } catch (error) {
-            console.error('Image compression failed:', error);
-            this.addSystemMessage('Failed to process image.');
+            console.error('Image upload failed:', error);
+            this.addSystemMessage('Failed to upload image. Please try again.');
         } finally {
             event.target.value = ''; // Reset input
         }
     }
 
-    compressImage(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = (e) => {
-                const img = new Image();
-                img.src = e.target.result;
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 300; // Small size to fit in WS limits
-                    let width = img.width;
-                    let height = img.height;
+    async uploadToImgBB(file) {
+        const apiKey = '5bb25da16b6754021200388d22797e88'; // Publicly available demo key or user-provided
+        const formData = new FormData();
+        formData.append('image', file);
 
-                    if (width > MAX_WIDTH) {
-                        height *= MAX_WIDTH / width;
-                        width = MAX_WIDTH;
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    // Low quality to save space
-                    resolve(canvas.toDataURL('image/jpeg', 0.5));
-                };
-                img.onerror = reject;
-            };
-            reader.onerror = reject;
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+            method: 'POST',
+            body: formData
         });
+
+        if (!response.ok) throw new Error('Upload failed');
+
+        const data = await response.json();
+        return data.data.url;
     }
 
-    sendImage(base64) {
+    sendImage(url) {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
         this.ws.send(JSON.stringify({
             cmd: 'chat',
-            text: `__IMG__:${base64}`
+            text: `__IMG__:${url}`
         }));
     }
 
-    // Emoji Picker Logic
+    // Advanced Emoji Picker Logic
     toggleEmojiPicker() {
         const picker = this.elements.emojiPicker;
         if (!picker) return;
 
         if (picker.style.display === 'none') {
-            this.populateEmojis();
-            picker.style.display = 'grid';
+            this.changeEmojiCategory('recent');
+            picker.style.display = 'flex';
         } else {
             picker.style.display = 'none';
         }
     }
 
-    populateEmojis() {
-        const picker = this.elements.emojiPicker;
-        if (!picker || picker.innerHTML !== '') return;
+    changeEmojiCategory(cat) {
+        // Update active tab
+        document.querySelectorAll('.emoji-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.cat === cat);
+        });
 
-        const emojis = [
-            '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
-            '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
-            '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
-            '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
-            '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
-            '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
-            '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
-            '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
-            '🥴', '🤢', '🤮', '🤧', '🥵', '🥶', '😶‍🌫️', '🫠', '🫣', '🫡',
-            '✋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞',
-            '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
-            '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
-            '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦿', '🦶', '👣',
-            '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️',
-            '👅', '👄', '🫦', '💋', '🩸'
-        ];
+        const container = this.elements.emojiContent;
+        if (!container) return;
 
-        picker.innerHTML = emojis.map(emoji => `
+        let emojis = [];
+        if (cat === 'recent') {
+            emojis = JSON.parse(localStorage.getItem('recent_emojis') || '[]');
+        } else {
+            emojis = this.getEmojiDatabase()[cat] || [];
+        }
+
+        if (emojis.length === 0 && cat === 'recent') {
+            container.innerHTML = '<div style="grid-column: 1/-1; padding: 20px; color: var(--text-muted); text-align: center;">No recent emojis</div>';
+            return;
+        }
+
+        container.innerHTML = emojis.map(emoji => `
             <div class="emoji-item" data-emoji="${emoji}">${emoji}</div>
         `).join('');
 
-        picker.querySelectorAll('.emoji-item').forEach(item => {
+        container.querySelectorAll('.emoji-item').forEach(item => {
             item.addEventListener('click', () => {
                 this.insertEmoji(item.dataset.emoji);
+                this.updateRecentEmojis(item.dataset.emoji);
             });
         });
+    }
+
+    updateRecentEmojis(emoji) {
+        let recents = JSON.parse(localStorage.getItem('recent_emojis') || '[]');
+        recents = recents.filter(e => e !== emoji);
+        recents.unshift(emoji);
+        recents = recents.slice(0, 50); // Keep top 50
+        localStorage.setItem('recent_emojis', JSON.stringify(recents));
+    }
+
+    getEmojiDatabase() {
+        return {
+            smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '🥵', '🥶', '😶‍🌫️', '🫠', '🫣', '🫡'],
+            people: ['👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝', '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦿', '🦶', '👣', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️', '👅', '👄', '🫦', '💋', '🩸', '👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👵', '🧓', '👴'],
+            nature: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦢', '🦉', '🦜', '🐊', '🐢', '🦎', '🐍', '🐲', '🐉', '🦕', '🦖', '🐳', '🐋', '🐬', '🐟', '🐠', '🐡', '🦈', '🐙', '🐚', '🐌', '🦋', '🐛', '🐜', '🐝', '🪲', '🐞', '🦗', '🕷️', '🕸️', '🦂', '🦟', '🪰', '🪱', '🦠', '💐', '🌸', '💮', '🏵️', '🌹', '🥀', '🌺', '🌻', '🌼', '🌷', '🌱', '🪴', '🌲', '🌳', '🌴', ' cactus', '🌾', '🌿', '☘️', '🍀', '🍁', '🍂', '🍃'],
+            food: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', ' watermelon', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌽', '🥕', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🥚', '🍳', '🧈', '🥞', ' waffle', '🥓', '🥩', '🍗', '🍖', '🦴', '🌭', '🍔', '🍟', '🍕', '🥪', '🥙', '🧆', '🌮', '🌯', '🥗', '🥘', '🫕', '🥣', '🥧', '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🍫', '🍬', '🍭', '🍮', '🍯', '🍼', '🥛', '☕', '🫖', '🍵', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🥤', '🧋', '🧃', '🧉', '🧊', '🥢', '🍽️', '🍴', '🥄', '🏺'],
+            activity: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', ' rugby', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', ' cricket', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️', '🎿', '⛷️', '🏂', '🏋️‍♀️', '🏋️', '🏋️‍♂️', '🤺', '🏊‍♀️', '🏊', '🏊‍♂️', '🤽‍♀️', '🤽', '🤽‍♂️', '🚣‍♀️', '🚣', '🚣‍♂️', '🏆', '🥇', '🥈', '🥉', '🏅', '🎖️', '🎫', '🎟️', '🎪', '🎭', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻', '🎲', '♟️', '🎯', '🎳', '🎮', '🎰', '🧩'],
+            travel: ['🌍', '🌎', '🌏', '🌐', '🗺️', '🗾', '🧭', '🏔️', '⛰️', '🌋', '🗻', '🏕️', '🏖️', '🏜️', '🏝️', '🏞️', '🏟️', '🏛️', '🏗️', '🏘️', '🏙️', '🏚️', '🏠', '🏡', '🏢', '🏣', '🏤', '🏥', '🏦', '🏨', '🏩', '🏪', '🏫', '🏬', '🏭', '🏯', '🏰', '💒', '🗼', '🗽', '⛪', '🕌', '🛕', '🕍', '⛩️', '🕋', '⛲', '⛺', '🌁', '🌃', '🏙️', '🌆', '🌇', '🌉', '♨️', '🎠', '🎡', '🎢', '🚂', '🚃', '🚄', '🚅', '🚆', '🚇', '🚈', '🚉', '🚊', '🚝', '🚞', '🚋', '🚌', '🚍', '🚎', '🚐', '🚑', '🚒', '🚓', '🚔', '🚕', '🚖', '🚗', '🚘', '🚙', '🛻', '🚚', '🚛', '🚜', '🏎️', '🏍️', '🛵', '🚲', '🛴', '🛹', '🛼', '🚏', '🛣️', '🛤️', '⛽', '🚨', '🚥', '🚦', '🛑', '🚧', '⚓', '⛵', '🛶', '🚤', '🛳️', '⛴️', '🛥️', '🚢', '✈️', '🛫', '🛬', '💺', '🚁', '🚟', '🚠', '🚡', '🚀', '🛸', '🛰️', '🪐', '🌤️', '🌥️', '🌦️', '🌧️', '🌨️', '🌩️', '🌪️', '🌫️', '🌬️', '🌈', '☀️', '🌕', '🌙', '⭐'],
+            objects: ['⌚', '📱', '📲', '💻', '⌨️', '🖱️', '🖲️', '🕹️', '🗜️', '💽', '💾', '💿', ' DVD', '📠', '📺', '📻', '🎙️', '🎚️', '🎛️', '🧭', '⏱️', '⏲️', '⏰', '🕰️', '⌛', '⏳', '📡', '🔋', '🔌', '💡', ' flashlight', '🕯️', '🪔', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '🪙', '💰', '💳', '💎', '⚖️', '🪜', '🧰', '🪛', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '⚙️', '🧱', '⛓️', '🪝', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '🛡️', '🚬', '⚰️', '🪦', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🩸', '🧬', '🌡️', '🧹', '🪠', '🧺', '🧻', '🚽', '🚰', '🚿', '🛁', '🪞', '🪟', '🪑', '🧼', '🪥', '🧴', '🛎️', '🔑', '🗝️', '🚪', '🛋️', '🛏️', '🧸', '🖼️', '🛍️', '🛒', '🎁', '🎈', '🎏', '🎀', '🪄', '🎊', '🎉', '✉️', '📩', '📨', '📧', '💌', '📥', '📤', '📦', '🏷️', '🪧', '📪', '📫', '📬', '📭', '📮', '📯', '📜', '📃', '📄', '📑', '📊', '📈', '📉', '🗒️', '🗓️', '📆', '📅', '🗑️', '📇', '🗃️', '🗳️', '🗄️', '📋', '📁', '📂', '🗂️', '🗞️', '📰', '📓', '📔', '📒', '📕', '📗', '📘', '📙', '📚', '📖', '🔖', '🧷', '🔗', '📎', '🖇️', '📐', '📏', '📌', '📍', '✂️', '🖊️', '🖋️', '✒️', '🖌️', '🖍️', '📝', '✏️', '🔍', '🔎', '🔏', '🔐', '🔑', '🔓'],
+            symbols: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '☮️', '✝️', '☪️', '🕉️', '☸️', '✡️', '🔯', '🕎', '☯️', '☦️', '⛎', '♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓', '🆔', '⚛️', '🉑', '☢️', '☣️', '📴', '📳', '🈶', '🈚', '🈸', '🈺', '✴️', '🆚', '💮', '🉐', '㊙️', '㊗️', '🈴', '🈵', '🈹', '🈲', '🅰️', '🅱️', ' AB', '🆑', '🅾️', '🆘', '❌', '⭕', '🛑', '⛔', '📛', '🚫', '💯', '💢', '♨️', '🚷', '🚯', '🚳', '🚱', '🔞', '📵', '🚭', '❗️', '❕', '❓', '❔', '‼️', '⁉️', '🔅', '🔆', '〽️', '⚠️', '🚸', '🔱', '⚜️', '🔰', '♻️', '✅', '💹', '🈯', '❇️', '✳️', '❎', '🌐', '💠', 'Ⓜ️', '🌀', '💤', '🏧', '🚾', '♿', '🅿️', '🚰', '🚮', '🚹', '🚺', '🚼', '🚻', '🚮', '🚾', '🛂', '🛃', '🛄', '🛅', '🆒', '🆓', '🆔', '🆕', '🆖', '🆗', '🆙', '🆘', '🆚', '🈁', '🈂️', '🈚', '🈯', '🈲', '🈳', '🈴', '🈵', '🈶', '🈷️', '🈸', '🈱', '🈲', '㊗️', '㊙️', '🈺', '🈵', '🉐', '🉑', '➕', '➖', '➗', '✖️', '♾️', '💲', '💱', '™️', '©️', '®️', '👁️‍🗨️', '🔚', '🔙', '🔛', '🔝', '🔜', '✔️', '☑️', '🔘', '⚪', '⚫', '🔴', '🔵', '🟥', '🟦', '🟧', '🟨', '🟩', '🟪', '🟫', '🔺', '🔻', '🔸', '🔹', '🔶', '🔷', '🔳', '🔲', '▪️', '▫️', '◾', '◽', '◼️', '◻️'],
+            flags: ['🏁', '🚩', '🎌', '🏴', '🏳️', '🏳️‍🌈', '🏳️‍⚧️', '🏴‍☠️', '🇦🇫', '🇦🇽', '🇦🇱', '🇩🇿', '🇦🇸', '🇦🇩', '🇦🇴', '🇦🇮', '🇦🇶', '🇦🇬', '🇦🇷', '🇦🇲', '🇦🇼', '🇦🇺', '🇦🇹', '🇦🇿', '🇧🇸', '🇧🇭', '🇧🇩', '🇧🇧', '🇧🇾', '🇧🇪', '🇧🇿', '🇧🇯', '🇧🇲', '🇧🇹', '🇧🇴', '🇧🇦', '🇧🇼', '🇧🇷', '🇧🇳', '🇧🇬', '🇧🇫', '🇧🇮', '🇰🇭', '🇨🇲', '🇨🇦', '🇨🇻', '🇨🇫', '🇹🇩', '🇨🇱', '🇨🇳', '🇨🇴', '🇰🇲', '🇨🇬', '🇨🇩', '🇨🇷', '🇨🇮', '🇭🇷', '🇨🇺', '🇨🇾', '🇨🇿', '🇩🇰', '🇩🇯', '🇩🇲', '🇩🇴', '🇪🇨', '🇪🇬', '🇸🇻', '🇪🇪', '🇪🇹', '🇪🇺', '🇫🇯', '🇫🇮', '🇫🇷', '🇬🇦', '🇬🇲', '🇬🇪', '🇩🇪', '🇬🇭', '🇬🇷', '🇬🇱', '🇬🇩', '🇬🇺', '🇬🇹', '🇬🇳', '🇭🇹', '🇭🇳', '🇭🇰', '🇭🇺', '🇮🇸', '🇮🇳', '🇮🇩', '🇮🇷', '🇮🇶', '🇮🇪', '🇮🇱', '🇮🇹', '🇯🇲', '🇯🇵', '🇯🇴', '🇰🇿', '🇰🇪', '🇰🇮', '🇰🇼', '🇰🇬', '🇱🇦', '🇱🇻', '🇱🇧', '🇱🇸', '🇱🇷', '🇱🇾', '🇱🇮', '🇱🇹', '🇱🇺', '🇲🇴', '🇲🇰', '🇲🇬', '🇲🇼', '🇲🇾', '🇲🇻', '🇲🇱', '🇲🇹', '🇲🇦', '🇲🇿', '🇲🇲', '🇳🇦', '🇳🇵', '🇳🇱', '🇳🇿', '🇳🇮', '🇳🇪', '🇳🇬', '🇳🇴', '🇴🇲', '🇵🇰', '🇵🇼', '🇵🇸', '🇵🇦', '🇵🇬', '🇵🇾', '🇵🇪', '🇵🇭', '🇵🇱', '🇵🇹', '🇵🇷', '🇶🇦', '🇷🇴', '🇷🇺', '🇷🇼', '🇼🇸', '🇸🇲', '🇸🇦', '🇸🇳', '🇷🇸', '🇸🇨', '🇸🇱', '🇸🇬', '🇸🇰', '🇸🇮', '🇸🇧', '🇸🇴', '🇿🇦', '🇰🇷', '🇸🇸', '🇪🇸', '🇱🇰', '🇸🇩', '🇸🇷', '🇸🇿', '🇸🇪', '🇨🇭', '🇸🇾', '🇹🇼', '🇹🇯', '🇹🇿', '🇹🇭', '🇹🇱', '🇹🇬', '🇹🇴', '🇹🇹', '🇹🇳', '🇹🇷', '🇹🇲', '🇹🇻', '🇺🇬', '🇺🇦', '🇦🇪', '🇬🇧', '🇺🇸', '🇺🇾', '🇺🇿', '🇻🇺', '🇻🇦', '🇻🇪', '🇻🇳', '🇾🇪', '🇿🇲', '🇿🇼']
+        };
     }
 
     insertEmoji(emoji) {
@@ -1211,7 +1257,7 @@ class RealtimeChat {
 
         // Auto-expand textarea
         input.style.height = 'auto';
-        input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+        input.style.height = Math.min(input.scrollHeight, 150) + 'px';
     }
 
     escapeHtml(text) {

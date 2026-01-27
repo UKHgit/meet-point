@@ -70,6 +70,26 @@
                     </div>
                 </div>
 
+                <div class="theme-section">
+                    <h3>🎨 Chat Theme</h3>
+                    <div class="theme-grid">
+                        <button class="theme-btn active" data-theme="default" title="Default Purple"
+                            style="background: #8b5cf6;"></button>
+                        <button class="theme-btn" data-theme="whatsapp-dark" title="WhatsApp Dark"
+                            style="background: #0b141a; border: 2px solid #00a884;"></button>
+                        <button class="theme-btn" data-theme="whatsapp-light" title="WhatsApp Light"
+                            style="background: #f0f2f5; border: 2px solid #00a884;"></button>
+                        <button class="theme-btn" data-theme="ocean" title="Ocean Blue"
+                            style="background: #0ea5e9;"></button>
+                        <button class="theme-btn" data-theme="emerald" title="Emerald Green"
+                            style="background: #10b981;"></button>
+                        <button class="theme-btn" data-theme="crimson" title="Crimson"
+                            style="background: #e11d48;"></button>
+                        <button class="theme-btn" data-theme="midnight" title="Midnight"
+                            style="background: #1e1b4b;"></button>
+                    </div>
+                </div>
+
                 <div class="connection-status">
                     <span id="connectionStatus">⚪ Not connected</span>
                 </div>
@@ -87,7 +107,21 @@
                     <button class="cancel-reply" id="cancelReply" aria-label="Cancel reply">✕</button>
                 </div>
 
-                <div id="emojiPicker" class="emoji-picker" style="display: none;"></div>
+                <div id="emojiPicker" class="emoji-picker" style="display: none;">
+                    <div class="emoji-tabs">
+                        <button class="emoji-tab active" data-cat="recent" title="Recent">🕒</button>
+                        <button class="emoji-tab" data-cat="smileys" title="Smileys">😀</button>
+                        <button class="emoji-tab" data-cat="people" title="People">👋</button>
+                        <button class="emoji-tab" data-cat="nature" title="Nature">🌲</button>
+                        <button class="emoji-tab" data-cat="food" title="Food">🍕</button>
+                        <button class="emoji-tab" data-cat="activity" title="Activity">⚽</button>
+                        <button class="emoji-tab" data-cat="travel" title="Travel">🚀</button>
+                        <button class="emoji-tab" data-cat="objects" title="Objects">💡</button>
+                        <button class="emoji-tab" data-cat="symbols" title="Symbols">🔣</button>
+                        <button class="emoji-tab" data-cat="flags" title="Flags">🚩</button>
+                    </div>
+                    <div id="emojiContent" class="emoji-content"></div>
+                </div>
                 <ul class="mention-suggestions" id="mentionSuggestions" style="display: none;"></ul>
 
                 <div class="input-area">
