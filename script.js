@@ -713,7 +713,8 @@ class RealtimeChat {
                 timestamp: data.timestamp
             });
         };
-        div.appendChild(replyBtn);
+        // Removed early append to append at the end
+
 
         const content = document.createElement('div');
         content.className = 'message-content';
@@ -781,6 +782,7 @@ class RealtimeChat {
         }
 
         div.appendChild(content);
+        div.appendChild(replyBtn);
 
         div.onclick = (e) => {
             const selection = window.getSelection();
