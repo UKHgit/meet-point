@@ -182,38 +182,31 @@ body {
 .message {
     margin-bottom: 1rem;
     display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
 .message.sent {
-    flex-direction: row-reverse;
+    align-items: flex-end;
 }
 
-.message-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: #4CAF50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 1.2rem;
-    flex-shrink: 0;
-}
-
-.message.sent .message-avatar {
-    background: #2196F3;
+.message.received {
+    align-items: flex-start;
 }
 
 .message-content {
-    flex: 1;
-    max-width: 70%;
+    max-width: 85%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }
 
 .message.sent .message-content {
-    text-align: right;
+    align-items: flex-end;
+}
+
+.message.received .message-content {
+    align-items: flex-start;
 }
 
 .message-header {
@@ -378,6 +371,49 @@ body {
     color: #e0e0e0;
 }
 
+/* Online users section */
+.online-users-section {
+    margin-bottom: 1rem;
+}
+
+.online-users-list {
+    background: #2d2d2d;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.online-user {
+    padding: 0.5rem;
+    border-bottom: 1px solid #404040;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.online-user:hover {
+    background: #363636;
+}
+
+.online-user-name {
+    font-weight: bold;
+    color: #4CAF50;
+}
+
+.online-user-status {
+    font-size: 0.875rem;
+    color: #808080;
+}
+
+.no-users {
+    padding: 1rem;
+    text-align: center;
+    color: #808080;
+    font-style: italic;
+}
+
 /* Join room section */
 .join-room {
     display: flex;
@@ -536,11 +572,27 @@ body {
         max-width: 85%; /* More space on mobile */
     }
     
-    .message.sent .message-text,
-    .message.received .message-text {
-        padding: 0.6rem;
-        font-size: 0.9rem;
-    }
+.message-text {
+    color: #e0e0e0;
+    line-height: 1.4;
+    word-wrap: break-word;
+    position: relative;
+    padding: 0.75rem;
+    border-radius: 12px;
+    display: inline-block;
+    max-width: 100%;
+}
+
+.message.sent .message-text {
+    background: #2196F3;
+    color: white;
+    border-radius: 12px 12px 2px 12px;
+}
+
+.message.received .message-text {
+    background: #2d2d2d;
+    border-radius: 12px 12px 12px 2px;
+}
     
     .input-area {
         padding: 0.75rem;
@@ -667,6 +719,36 @@ body {
         padding: 0.5rem 0.8rem;
         font-size: 0.8rem;
     }
+}
+
+/* Typing indicator */
+.typing-indicator {
+    padding: 0.5rem 1rem;
+    background: #2d2d2d;
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: #808080;
+    font-style: italic;
+}
+
+#typingText {
+    color: #4CAF50;
+}
+
+/* Read receipts */
+.message.read-receipt {
+    font-size: 0.75rem;
+    color: #4CAF50;
+    margin-top: 0.25rem;
+}
+
+.read-receipt.delivered {
+    color: #808080;
+}
+
+.read-receipt.read {
+    color: #4CAF50;
 }
 
 /* Touch optimizations */

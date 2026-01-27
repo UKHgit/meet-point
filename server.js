@@ -131,6 +131,12 @@ class ChatServer {
             case 'createRoom':
                 this.createRoom(client, message.room);
                 break;
+            case 'typing':
+                this.handleTyping(client, message.username);
+                break;
+            case 'read':
+                this.handleReadReceipt(client, message.messageId);
+                break;
         }
     }
 
@@ -143,10 +149,26 @@ class ChatServer {
             username: client.username,
             text: message.text.trim(),
             room: client.room,
+            replyTo: message.replyTo || null,
             timestamp: new Date().toISOString()
         };
         
         this.broadcastToRoom(client.room, chatMessage);
+    }
+
+    handleTyping(client, username) {
+        this.broadcastToRoom(client.room, {
+            type: 'typing',
+            username: username
+        });
+    }
+
+    handleReadReceipt(client, messageId) {
+        this.broadcastToRoom(client.room, {
+            type: 'readReceipt',
+            messageId: messageId,
+            username: client.username
+        });
     }
 
     updateUsername(client, username) {
@@ -163,12 +185,58 @@ class ChatServer {
 
     joinRoom(client, roomName) {
         if (!this.rooms.has(roomName)) {
-            this.sendToClient(client, {
-                type: 'system',
-                text: `Room '${roomName}' does not exist`
+            this.rooms.set(roomName, {
+                name: roomName,
+                users: new Set(),
+                messages: [],
+                created: new Date()
             });
-            return;
         }
+        
+        // Leave current room
+        if (client.room) {
+            this.broadcastToRoom(client.room, {
+                type: 'system',
+                text: `${client.username} left the room`
+            });
+            
+            const room = this.rooms.get(client.room);
+            if (room) {
+                room.users.delete(client.id);
+            }
+        }
+        
+        // Join new room
+        const room = this.rooms.get(roomName);
+        if (room) {
+            room.users.add(client.id);
+            client.room = roomName;
+            client.id = this.generateId();
+            
+            // Send room users update
+            const users = Array.from(room.users).map(id => {
+                const user = this.clients.get(id);
+                return user ? user.username : 'Anonymous';
+            });
+            
+            this.broadcastToRoom(roomName, {
+                type: 'usersUpdate',
+                users: users
+            });
+            
+            this.sendToClient(client, {
+                type: 'joinedRoom',
+                room: roomName
+            });
+            
+            this.broadcastToRoom(roomName, {
+                type: 'system',
+                text: `${client.username} joined the room`
+            });
+            
+            this.updateUserCount(room.users.size);
+        }
+    }
         
         // Leave current room
         if (client.room) {

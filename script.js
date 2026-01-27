@@ -7,6 +7,12 @@ class ChatApp {
         this.clientId = Math.random().toString(36).substr(2, 9);
         this.replyingTo = null;
         
+        // Initialize data structures
+        this.onlineUsers = new Map();
+        this.typingUsers = new Set();
+        this.typingTimeout = null;
+        this.readReceipts = new Map();
+        
         this.initializeElements();
         this.promptUsername();
         this.bindEvents();
@@ -35,8 +41,17 @@ class ChatApp {
             menuToggle: document.getElementById('menuToggle'),
             mobileTitle: document.getElementById('mobileTitle'),
             mobileUsers: document.getElementById('mobileUsers'),
-            sidebar: document.querySelector('.sidebar')
+            sidebar: document.querySelector('.sidebar'),
+            onlineUsersList: document.getElementById('onlineUsersList'),
+            typingIndicator: document.getElementById('typingIndicator'),
+            typingText: document.getElementById('typingText')
         };
+        
+        // Initialize data structures
+        this.onlineUsers = new Map();
+        this.typingUsers = new Set();
+        this.typingTimeout = null;
+        this.readReceipts = new Map();
     }
 
     bindEvents() {
@@ -61,11 +76,18 @@ class ChatApp {
                 }
             });
 
-            // Auto-resize textarea
-            this.elements.messageInput.addEventListener('input', () => {
-                this.elements.messageInput.style.height = 'auto';
-                this.elements.messageInput.style.height = Math.min(this.elements.messageInput.scrollHeight, 120) + 'px';
-            });
+        // Auto-resize textarea
+        this.elements.messageInput.addEventListener('input', () => {
+            this.elements.messageInput.style.height = 'auto';
+            this.elements.messageInput.style.height = Math.min(this.elements.messageInput.scrollHeight, 120) + 'px';
+            
+            // Handle typing indicator
+            if (this.elements.messageInput.value.trim() && this.isConnected && this.currentRoom) {
+                this.sendTypingIndicator();
+            } else {
+                this.stopTypingIndicator();
+            }
+        });
         }
 
         // Username change
@@ -266,6 +288,15 @@ class ChatApp {
                 this.highlightCurrentRoom();
                 this.clearMessages();
                 break;
+            case 'typing':
+                this.showTypingIndicator(data.username);
+                break;
+            case 'usersUpdate':
+                this.updateOnlineUsers(data.users);
+                break;
+            case 'readReceipt':
+                this.addReadReceipt(data.messageId, 'read');
+                break;
         }
     }
 
@@ -289,7 +320,7 @@ class ChatApp {
             console.log('Not connected, returning');
             return;
         }
-
+        
         // Ensure we have a username
         console.log('Current username:', this.username);
         if (!this.username || this.username.trim() === '') {
@@ -297,6 +328,9 @@ class ChatApp {
             this.promptUsername();
             return;
         }
+        
+        // Stop typing indicator
+        this.stopTypingIndicator();
 
         const message = {
             type: 'message',
@@ -349,9 +383,13 @@ class ChatApp {
         messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
         messageDiv.dataset.messageId = data.id;
         
-        const avatar = document.createElement('div');
-        avatar.className = 'message-avatar';
-        avatar.textContent = data.username.charAt(0).toUpperCase();
+        // Make message clickable for reply
+        messageDiv.style.cursor = 'pointer';
+        messageDiv.onclick = (e) => {
+            if (!e.target.closest('.reply-tag') && !e.target.closest('.cancel-reply')) {
+                this.replyToMessage(data);
+            }
+        };
         
         const content = document.createElement('div');
         content.className = 'message-content';
@@ -373,7 +411,10 @@ class ChatApp {
         username.className = 'message-username';
         username.textContent = data.username;
         username.classList.add('reply-tag');
-        username.onclick = () => this.replyToMessage(data);
+        username.onclick = (e) => {
+            e.stopPropagation();
+            this.replyToMessage(data);
+        };
         
         const time = document.createElement('span');
         time.className = 'message-time';
@@ -391,17 +432,31 @@ class ChatApp {
         
         content.appendChild(text);
         
+        // Add read receipt for sent messages
+        if (isSent) {
+            const receipt = document.createElement('div');
+            receipt.className = 'read-receipt delivered';
+            receipt.dataset.receiptFor = data.id;
+            receipt.textContent = '✓';
+            content.appendChild(receipt);
+        }
+        
         if (isSent) {
             content.appendChild(header);
-            messageDiv.appendChild(content);
-            messageDiv.appendChild(avatar);
-        } else {
-            messageDiv.appendChild(avatar);
-            messageDiv.appendChild(content);
         }
+        
+        messageDiv.appendChild(content);
         
         this.elements.messages.appendChild(messageDiv);
         this.scrollToBottom();
+        
+        // Mark as read if it's not our message
+        if (!isSent && this.socket) {
+            this.socket.send(JSON.stringify({
+                type: 'read',
+                messageId: data.id
+            }));
+        }
     }
 
     addSystemMessage(text) {
@@ -454,6 +509,77 @@ class ChatApp {
     handleResize() {
         if (window.innerWidth > 768) {
             this.elements.sidebar.classList.remove('expanded');
+        }
+    }
+
+    sendTypingIndicator() {
+        if (this.socket) {
+            this.socket.send(JSON.stringify({
+                type: 'typing',
+                username: this.username
+            }));
+        }
+    }
+
+    stopTypingIndicator() {
+        if (this.typingTimeout) {
+            clearTimeout(this.typingTimeout);
+            this.typingTimeout = null;
+        }
+    }
+
+    showTypingIndicator(username) {
+        if (!username || username === this.username) return;
+        
+        this.typingUsers.add(username);
+        this.typingTimeout = setTimeout(() => {
+            this.typingUsers.delete(username);
+            this.updateTypingIndicator();
+        }, 3000);
+        
+        this.updateTypingIndicator();
+    }
+
+    updateTypingIndicator() {
+        if (!this.elements.typingIndicator) return;
+        
+        const typers = Array.from(this.typingUsers).filter(u => u !== this.username);
+        if (typers.length === 0) {
+            this.elements.typingIndicator.style.display = 'none';
+        } else if (typers.length === 1) {
+            this.elements.typingText.textContent = `${typers[0]} is typing...`;
+            this.elements.typingIndicator.style.display = 'block';
+        } else {
+            this.elements.typingText.textContent = `${typers.length} people are typing...`;
+            this.elements.typingIndicator.style.display = 'block';
+        }
+    }
+
+    updateOnlineUsers() {
+        if (!this.elements.onlineUsersList) return;
+        
+        const users = Array.from(this.onlineUsers.keys());
+        if (users.length === 0) {
+            this.elements.onlineUsersList.innerHTML = '<div class="no-users">No users online</div>';
+        } else {
+            this.elements.onlineUsersList.innerHTML = users.map(username => `
+                <div class="online-user" data-username="${username}">
+                    <span class="online-user-name">${username}</span>
+                    <span class="online-user-status">●</span>
+                </div>
+            `).join('');
+        }
+        
+        this.updateUserCount(users.length);
+    }
+
+    addReadReceipt(messageId, status = 'delivered') {
+        this.readReceipts.set(messageId, status);
+        
+        const existingReceipt = document.querySelector(`[data-receipt-for="${messageId}"]`);
+        if (existingReceipt) {
+            existingReceipt.className = `read-receipt ${status}`;
+            existingReceipt.textContent = status === 'read' ? '✓✓' : '✓';
         }
     }
 

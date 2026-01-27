@@ -35,6 +35,13 @@
                     </div>
                 </div>
                 
+                <div class="online-users-section">
+                    <h3>Online Users</h3>
+                    <div class="online-users-list" id="onlineUsersList">
+                        <div class="no-users">No users online</div>
+                    </div>
+                </div>
+                
                 <div class="user-section">
                     <h3>Your Name</h3>
                     <div class="user-info">
@@ -52,6 +59,9 @@
                         <span id="replyText"></span>
                     </div>
                     <button class="cancel-reply" id="cancelReply">✕</button>
+                </div>
+                <div class="typing-indicator" id="typingIndicator" style="display: none;">
+                    <span id="typingText">Someone is typing...</span>
                 </div>
                 <div class="input-area">
                     <textarea id="messageInput" placeholder="Type your message..." rows="1"></textarea>
