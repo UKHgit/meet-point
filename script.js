@@ -1147,7 +1147,7 @@ class RealtimeChat {
             this.onboardingSteps = [
                 {
                     title: "Welcome to Meet Point!",
-                    desc: "The ultimate real-time chat experience inspired by WhatsApp. Let's show you around!",
+                    desc: "A premium real-time chat experience made by UKH. Let's show you around!",
                     icon: "👋",
                     target: null
                 },
