@@ -368,7 +368,9 @@ class ChatApp {
             
             this.elements.messageInput.value = '';
             this.elements.messageInput.style.height = 'auto';
-            this.cancelReply();
+            // Clear reply state after successful send
+            this.replyingTo = null;
+            this.elements.replyPreview.style.display = 'none';
         } catch (error) {
             console.error('Error sending message:', error);
             this.addSystemMessage('Failed to send message');
@@ -386,9 +388,19 @@ class ChatApp {
         // Make message clickable for reply
         messageDiv.style.cursor = 'pointer';
         messageDiv.onclick = (e) => {
-            if (!e.target.closest('.reply-tag') && !e.target.closest('.cancel-reply')) {
+            // Don't trigger on clicks to cancel button or reply tags
+            if (!e.target.closest('.cancel-reply') && !e.target.closest('.reply-tag')) {
                 this.replyToMessage(data);
             }
+        };
+        
+        // Add hover effect to entire message
+        messageDiv.onmouseenter = () => {
+            messageDiv.style.background = 'rgba(45, 45, 45, 0.1)';
+        };
+        
+        messageDiv.onmouseleave = () => {
+            messageDiv.style.background = 'transparent';
         };
         
         const content = document.createElement('div');

@@ -184,6 +184,9 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    transition: background 0.2s ease;
+    border-radius: 8px;
+    padding: 0.25rem;
 }
 
 .message.sent {
@@ -192,6 +195,18 @@ body {
 
 .message.received {
     align-items: flex-start;
+}
+
+.message:hover {
+    background: rgba(45, 45, 45, 0.1);
+}
+
+.message.sent:hover {
+    background: rgba(33, 150, 243, 0.05);
+}
+
+.message.received:hover {
+    background: rgba(45, 45, 45, 0.05);
 }
 
 .message-content {
@@ -330,12 +345,59 @@ body {
 
 /* Reply preview */
 .reply-preview {
-    background: #2d2d2d;
+    background: rgba(76, 175, 80, 0.1);
     border-left: 3px solid #4CAF50;
-    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
     margin: 0.5rem;
-    border-radius: 4px;
     position: relative;
+    backdrop-filter: blur(10px);
+}
+
+.reply-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+#replyUsername {
+    font-weight: bold;
+    color: #4CAF50;
+    font-size: 0.875rem;
+}
+
+#replyText {
+    color: #b0b0b0;
+    font-size: 0.875rem;
+    font-style: italic;
+    max-height: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.cancel-reply {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: rgba(255, 255, 255, 0.8);
+    border: none;
+    color: #808080;
+    cursor: pointer;
+    font-size: 1.2rem;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cancel-reply:hover {
+    color: #e0e0e0;
+    background: rgba(255, 255, 255, 0.9);
 }
 
 .reply-info {
@@ -462,22 +524,27 @@ body {
 
 /* Message reply styling */
 .message-reply {
-    background: rgba(76, 175, 80, 0.1);
+    background: rgba(76, 175, 80, 0.15);
     border-left: 3px solid #4CAF50;
-    padding: 0.5rem;
-    margin-bottom: 0.5rem;
-    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-radius: 6px 6px 6px 6px;
     font-size: 0.875rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .reply-tag {
     color: #4CAF50;
     font-weight: bold;
     cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background 0.2s;
 }
 
 .reply-tag:hover {
-    text-decoration: underline;
+    background: rgba(76, 175, 80, 0.25);
+    text-decoration: none;
 }
 
 /* Mobile Header */
