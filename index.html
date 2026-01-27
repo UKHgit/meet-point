@@ -87,12 +87,23 @@
                     <button class="cancel-reply" id="cancelReply" aria-label="Cancel reply">✕</button>
                 </div>
 
+                <div id="emojiPicker" class="emoji-picker" style="display: none;"></div>
                 <ul class="mention-suggestions" id="mentionSuggestions" style="display: none;"></ul>
 
                 <div class="input-area">
-                    <textarea id="messageInput" placeholder="Type your message..." rows="1"
-                        autocomplete="off"></textarea>
-                    <button id="sendBtn">Send</button>
+                    <button id="emojiBtn" class="icon-btn" title="Emojis">😀</button>
+                    <button id="attachBtn" class="icon-btn" title="Send Image">📎</button>
+                    <input type="file" id="imageInput" accept="image/*" hidden>
+                    <div class="input-wrapper">
+                        <textarea id="messageInput" placeholder="Type a message" rows="1" autocomplete="off"></textarea>
+                    </div>
+                    <button id="sendBtn" class="whatsapp-send-btn" aria-label="Send">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                            <path
+                                d="M1.101 21.757L23.8 12.028 1.101 2.3l.011 7.912 13.623 1.816-13.623 1.817-.011 7.912z">
+                            </path>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </main>

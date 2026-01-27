@@ -51,7 +51,8 @@ class RealtimeChat {
             'roomNameInput', 'joinRoomBtn', 'currentRoomDisplay', 'replyPreview',
             'replyUsername', 'replyText', 'cancelReply', 'changeNameBtn', 'menuToggle',
             'mobileTitle', 'mobileUsers', 'onlineUsersList', 'roomName', 'connectionStatus',
-            'shareLink', 'copyLinkBtn', 'mentionSuggestions', 'typingIndicator'
+            'shareLink', 'copyLinkBtn', 'mentionSuggestions', 'typingIndicator',
+            'emojiPicker', 'emojiBtn', 'attachBtn', 'imageInput'
         ];
 
         ids.forEach(id => {
@@ -151,7 +152,26 @@ class RealtimeChat {
             this.elements.menuToggle.addEventListener('click', () => this.toggleMobileMenu());
         }
 
+        // WhatsApp Style Features
+        if (this.elements.attachBtn) {
+            this.elements.attachBtn.addEventListener('click', () => this.elements.imageInput.click());
+        }
+
+        if (this.elements.imageInput) {
+            this.elements.imageInput.addEventListener('change', (e) => this.handleImageSelect(e));
+        }
+
+        if (this.elements.emojiBtn) {
+            this.elements.emojiBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.toggleEmojiPicker();
+            });
+        }
+
         document.addEventListener('click', (e) => {
+            if (this.elements.emojiPicker && !this.elements.emojiPicker.contains(e.target) && e.target !== this.elements.emojiBtn) {
+                this.elements.emojiPicker.style.display = 'none';
+            }
             if (window.innerWidth <= 768 && this.elements.sidebar && this.elements.menuToggle) {
                 if (!this.elements.sidebar.contains(e.target) && !this.elements.menuToggle.contains(e.target)) {
                     this.elements.sidebar.classList.remove('expanded');
@@ -478,6 +498,16 @@ class RealtimeChat {
                     return;
                 }
 
+                if (data.text.startsWith('__IMG__:')) {
+                    this.addMessage({
+                        username: data.nick || 'Anonymous',
+                        text: data.text, // Contains the __IMG__: data
+                        timestamp: data.time ? new Date(data.time) : new Date(),
+                        trip: data.trip
+                    }, data.nick === this.username);
+                    return;
+                }
+
                 // Chat message
                 this.addMessage({
                     username: data.nick || 'Anonymous',
@@ -771,7 +801,16 @@ class RealtimeChat {
             content.appendChild(header);
         }
 
-        content.appendChild(text);
+        if (data.text.startsWith('__IMG__:')) {
+            const img = document.createElement('img');
+            img.src = data.text.substring(8);
+            img.className = 'message-image';
+            img.alt = 'Image';
+            img.onclick = () => window.open(img.src);
+            content.appendChild(img);
+        } else {
+            content.appendChild(text);
+        }
 
         if (isSent) {
             const sentTime = document.createElement('div');
@@ -1045,6 +1084,134 @@ class RealtimeChat {
         } else {
             indicator.textContent = `${users.length} users are typing...`;
         }
+    }
+
+    // Image Handling Logic
+    async handleImageSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            this.addSystemMessage('Please select an image file.');
+            return;
+        }
+
+        try {
+            const base64 = await this.compressImage(file);
+            this.sendImage(base64);
+        } catch (error) {
+            console.error('Image compression failed:', error);
+            this.addSystemMessage('Failed to process image.');
+        } finally {
+            event.target.value = ''; // Reset input
+        }
+    }
+
+    compressImage(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 300; // Small size to fit in WS limits
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Low quality to save space
+                    resolve(canvas.toDataURL('image/jpeg', 0.5));
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+    }
+
+    sendImage(base64) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+        this.ws.send(JSON.stringify({
+            cmd: 'chat',
+            text: `__IMG__:${base64}`
+        }));
+    }
+
+    // Emoji Picker Logic
+    toggleEmojiPicker() {
+        const picker = this.elements.emojiPicker;
+        if (!picker) return;
+
+        if (picker.style.display === 'none') {
+            this.populateEmojis();
+            picker.style.display = 'grid';
+        } else {
+            picker.style.display = 'none';
+        }
+    }
+
+    populateEmojis() {
+        const picker = this.elements.emojiPicker;
+        if (!picker || picker.innerHTML !== '') return;
+
+        const emojis = [
+            '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+            '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+            '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
+            '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
+            '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+            '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
+            '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
+            '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
+            '🥴', '🤢', '🤮', '🤧', '🥵', '🥶', '😶‍🌫️', '🫠', '🫣', '🫡',
+            '✋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞',
+            '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
+            '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝',
+            '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦵', '🦿', '🦶', '👣',
+            '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', '🦴', '👀', '👁️',
+            '👅', '👄', '🫦', '💋', '🩸'
+        ];
+
+        picker.innerHTML = emojis.map(emoji => `
+            <div class="emoji-item" data-emoji="${emoji}">${emoji}</div>
+        `).join('');
+
+        picker.querySelectorAll('.emoji-item').forEach(item => {
+            item.addEventListener('click', () => {
+                this.insertEmoji(item.dataset.emoji);
+            });
+        });
+    }
+
+    insertEmoji(emoji) {
+        const input = this.elements.messageInput;
+        if (!input) return;
+
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        const text = input.value;
+
+        input.value = text.substring(0, start) + emoji + text.substring(end);
+        input.focus();
+
+        // Move cursor after the emoji
+        const newPos = start + emoji.length;
+        input.setSelectionRange(newPos, newPos);
+
+        // Auto-expand textarea
+        input.style.height = 'auto';
+        input.style.height = Math.min(input.scrollHeight, 120) + 'px';
     }
 
     escapeHtml(text) {
