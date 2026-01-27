@@ -923,6 +923,7 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    overflow-x: hidden;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     z-index: 2000;
     backdrop-filter: blur(15px);
@@ -969,9 +970,10 @@ body {
 .emoji-content {
     flex: 1;
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
     padding: 10px;
     overflow-y: auto;
+    overflow-x: hidden;
     align-content: start;
 }
 
