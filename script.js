@@ -784,6 +784,75 @@ class RealtimeChat {
         div.appendChild(content);
         div.appendChild(replyBtn);
 
+        // Swipe to reply logic
+        let startX = 0;
+        let startY = 0;
+        let currentX = 0;
+        let isSwiping = false;
+
+        div.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            isSwiping = true;
+            div.style.transition = 'none';
+        }, { passive: true });
+
+        div.addEventListener('touchmove', (e) => {
+            if (!isSwiping) return;
+
+            const x = e.touches[0].clientX;
+            const y = e.touches[0].clientY;
+            const diffX = x - startX;
+            const diffY = y - startY;
+
+            // If vertical scroll is dominant, cancel swipe
+            if (Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 10) {
+                isSwiping = false;
+                div.style.transform = 'translateX(0)';
+                return;
+            }
+
+            // Only allow right swipe for reply
+            if (diffX > 0) {
+                currentX = x;
+                let moveX = diffX;
+                if (moveX > 100) moveX = 100 + (moveX - 100) * 0.2; // Resistance
+
+                div.style.transform = `translateX(${moveX}px)`;
+
+                if (moveX > 50) {
+                    div.classList.add('swiping-reply');
+                    if (window.navigator.vibrate) window.navigator.vibrate(5);
+                } else {
+                    div.classList.remove('swiping-reply');
+                }
+            }
+        }, { passive: true });
+
+        div.addEventListener('touchend', () => {
+            if (!isSwiping) return;
+            isSwiping = false;
+
+            const diffX = currentX - startX;
+            div.style.transition = 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            div.style.transform = 'translateX(0)';
+
+            if (diffX > 60) {
+                this.replyToMessage({
+                    username: data.username,
+                    text: messageText,
+                    timestamp: data.timestamp
+                });
+            }
+
+            setTimeout(() => {
+                div.classList.remove('swiping-reply');
+            }, 300);
+
+            startX = 0;
+            currentX = 0;
+        });
+
         div.onclick = (e) => {
             const selection = window.getSelection();
             if (selection.toString().length === 0) {

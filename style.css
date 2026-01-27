@@ -359,7 +359,34 @@ body {
     gap: 0.25rem;
     max-width: 75%;
     position: relative;
+    transition: transform 0.2s ease;
     animation: messageSlide 0.3s ease-out;
+}
+
+.message::after {
+    content: '↩';
+    position: absolute;
+    left: -35px;
+    top: 50%;
+    transform: translateY(-50%) scale(0);
+    background: var(--primary);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.9rem;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: -1;
+}
+
+.message.swiping-reply::after {
+    transform: translateY(-50%) scale(1);
+    opacity: 1;
+    left: -45px;
 }
 
 @keyframes messageSlide {
