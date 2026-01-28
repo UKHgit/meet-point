@@ -145,6 +145,24 @@
                 </div>
                 <ul class="mention-suggestions" id="mentionSuggestions" style="display: none;"></ul>
 
+                <!-- Image Preview Modal -->
+                <div id="imagePreviewModal" class="image-preview-modal" style="display: none;">
+                    <div class="image-preview-container">
+                        <div class="image-preview-header">
+                            <button id="closeImagePreview" class="preview-close-btn" title="Close">✕</button>
+                            <button id="downloadImageBtn" class="preview-download-btn" title="Download">⬇️ Download</button>
+                        </div>
+                        <div class="image-preview-content">
+                            <img id="previewImage" alt="Preview" style="max-width: 90vw; max-height: 90vh; object-fit: contain;">
+                        </div>
+                        <div class="image-preview-footer">
+                            <button id="zoomInBtn" class="zoom-btn" title="Zoom In">🔍+</button>
+                            <button id="zoomResetBtn" class="zoom-btn" title="Reset Zoom">🔄</button>
+                            <button id="zoomOutBtn" class="zoom-btn" title="Zoom Out">🔍−</button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="input-area">
                     <button id="emojiBtn" class="icon-btn" title="Emojis">😀</button>
                     <button id="attachBtn" class="icon-btn" title="Share Files">📎</button>

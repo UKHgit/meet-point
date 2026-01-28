@@ -876,12 +876,7 @@ class RealtimeChat {
             img.style.maxWidth = '100%';
             img.style.borderRadius = '10px';
             img.style.cursor = 'pointer';
-            img.onclick = () => {
-                const a = document.createElement('a');
-                a.href = img.src;
-                a.download = 'image';
-                a.click();
-            };
+            img.onclick = () => this.openImagePreview(img.src);
             content.appendChild(img);
         } else if (data.text.startsWith('__VIDEO__:') || data.text.startsWith('__AUDIO__:') || data.text.startsWith('__FILE__:')) {
             // Handle video, audio, and file attachments
@@ -1598,6 +1593,74 @@ class RealtimeChat {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Image Preview Modal
+    openImagePreview(imageSrc) {
+        const modal = document.getElementById('imagePreviewModal');
+        const previewImg = document.getElementById('previewImage');
+        const downloadBtn = document.getElementById('downloadImageBtn');
+        const closeBtn = document.getElementById('closeImagePreview');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const zoomResetBtn = document.getElementById('zoomResetBtn');
+
+        if (!modal || !previewImg) return;
+
+        previewImg.src = imageSrc;
+        modal.style.display = 'flex';
+        let currentZoom = 1;
+
+        // Download button
+        downloadBtn.onclick = () => {
+            const a = document.createElement('a');
+            a.href = imageSrc;
+            a.download = 'image_' + Date.now();
+            a.click();
+        };
+
+        // Close button
+        closeBtn.onclick = () => {
+            modal.style.display = 'none';
+            currentZoom = 1;
+            previewImg.style.transform = 'scale(1)';
+        };
+
+        // Zoom controls
+        zoomInBtn.onclick = () => {
+            currentZoom = Math.min(currentZoom + 0.2, 3);
+            previewImg.style.transform = `scale(${currentZoom})`;
+        };
+
+        zoomOutBtn.onclick = () => {
+            currentZoom = Math.max(currentZoom - 0.2, 0.5);
+            previewImg.style.transform = `scale(${currentZoom})`;
+        };
+
+        zoomResetBtn.onclick = () => {
+            currentZoom = 1;
+            previewImg.style.transform = 'scale(1)';
+        };
+
+        // Close on background click
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+                currentZoom = 1;
+                previewImg.style.transform = 'scale(1)';
+            }
+        };
+
+        // Close on Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                modal.style.display = 'none';
+                currentZoom = 1;
+                previewImg.style.transform = 'scale(1)';
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
     }
 }
 
