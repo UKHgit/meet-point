@@ -859,36 +859,52 @@ class RealtimeChat {
         }
 
         if (data.text.startsWith('__IMG__:')) {
-            const url = data.text.substring(8);
+            const urlPart = data.text.substring(8);
+            // Handle format: url|filename
+            const [rawUrl] = urlPart.split('|');
+            const url = rawUrl.trim();
             const img = document.createElement('img');
-            
+
             // Handle base64 files from sessionStorage
             if (url.startsWith('base64:')) {
-                const [, fileId] = url.split(':');
+                const parts = url.split(':');
+                const fileId = parts[1];
                 const base64Data = sessionStorage.getItem(fileId);
-                img.src = base64Data;
+                if (base64Data) {
+                    img.src = base64Data;
+                } else {
+                    img.alt = 'Image expired';
+                    img.style.padding = '20px';
+                    img.style.background = 'rgba(0,0,0,0.2)';
+                }
             } else {
                 img.src = url;
             }
-            
+
             img.className = 'message-image';
             img.alt = 'Image';
             img.style.maxWidth = '100%';
             img.style.borderRadius = '10px';
             img.style.cursor = 'pointer';
+            img.onerror = () => {
+                img.alt = 'Failed to load image';
+                img.style.padding = '15px';
+                img.style.background = 'rgba(0,0,0,0.2)';
+                img.style.border = '1px dashed var(--border-color)';
+            };
             img.onclick = () => this.openImagePreview(img.src);
             content.appendChild(img);
         } else if (data.text.startsWith('__VIDEO__:') || data.text.startsWith('__AUDIO__:') || data.text.startsWith('__FILE__:')) {
             // Handle video, audio, and file attachments
             const [prefix, urlAndName] = data.text.split(':');
             const [url, fileName] = urlAndName.split('|');
-            
+
             const mediaContainer = document.createElement('div');
             mediaContainer.className = 'message-media';
             mediaContainer.style.padding = '10px';
             mediaContainer.style.background = 'rgba(0,0,0,0.1)';
             mediaContainer.style.borderRadius = '8px';
-            
+
             if (prefix === '__VIDEO__') {
                 const video = document.createElement('video');
                 if (url.startsWith('base64:')) {
@@ -1364,7 +1380,7 @@ class RealtimeChat {
                 this.addSystemMessage(`Failed to upload ${file.name}. Please try again.`);
             }
         }
-        
+
         // Reset input
         if (event.target.value) {
             event.target.value = '';
@@ -1373,7 +1389,7 @@ class RealtimeChat {
 
     async uploadFile(file) {
         console.log('Attempting file upload:', file.name, file.size);
-        
+
         // Try Imgur (most reliable for browser uploads)
         try {
             return await this.uploadToImgur(file);
@@ -1595,7 +1611,7 @@ class RealtimeChat {
         return div.innerHTML;
     }
 
-    // Image Preview Modal
+    // Image Preview Modal with Pinch-to-Zoom (WhatsApp style)
     openImagePreview(imageSrc) {
         const modal = document.getElementById('imagePreviewModal');
         const previewImg = document.getElementById('previewImage');
@@ -1609,45 +1625,171 @@ class RealtimeChat {
 
         previewImg.src = imageSrc;
         modal.style.display = 'flex';
-        let currentZoom = 1;
 
-        // Download button
-        downloadBtn.onclick = () => {
-            const a = document.createElement('a');
-            a.href = imageSrc;
-            a.download = 'image_' + Date.now();
-            a.click();
+        let currentScale = 1;
+        let startDistance = 0;
+        let startScale = 1;
+        let translateX = 0;
+        let translateY = 0;
+        let startPanX = 0;
+        let startPanY = 0;
+        let isPanning = false;
+
+        const updateTransform = () => {
+            previewImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentScale})`;
+        };
+
+        const resetZoom = () => {
+            currentScale = 1;
+            translateX = 0;
+            translateY = 0;
+            updateTransform();
+        };
+
+        // Pinch-to-zoom for mobile
+        previewImg.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                startDistance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                startScale = currentScale;
+            } else if (e.touches.length === 1 && currentScale > 1) {
+                isPanning = true;
+                startPanX = e.touches[0].clientX - translateX;
+                startPanY = e.touches[0].clientY - translateY;
+            }
+        }, { passive: false });
+
+        previewImg.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const distance = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                currentScale = Math.min(Math.max(startScale * (distance / startDistance), 0.5), 4);
+                updateTransform();
+            } else if (e.touches.length === 1 && isPanning) {
+                e.preventDefault();
+                translateX = e.touches[0].clientX - startPanX;
+                translateY = e.touches[0].clientY - startPanY;
+                updateTransform();
+            }
+        }, { passive: false });
+
+        previewImg.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) {
+                startDistance = 0;
+            }
+            if (e.touches.length === 0) {
+                isPanning = false;
+                if (currentScale <= 1) {
+                    resetZoom();
+                }
+            }
+        });
+
+        // Double tap to zoom
+        let lastTap = 0;
+        previewImg.addEventListener('touchend', (e) => {
+            if (e.touches.length === 0 && e.changedTouches.length === 1) {
+                const now = Date.now();
+                if (now - lastTap < 300) {
+                    currentScale = currentScale > 1 ? 1 : 2;
+                    translateX = 0;
+                    translateY = 0;
+                    updateTransform();
+                }
+                lastTap = now;
+            }
+        });
+
+        // Download button - handles both remote and base64 images
+        downloadBtn.onclick = async () => {
+            try {
+                let dataUrl = imageSrc;
+
+                // If it's a remote URL, fetch and convert to blob
+                if (imageSrc.startsWith('http')) {
+                    try {
+                        const response = await fetch(imageSrc);
+                        const blob = await response.blob();
+                        dataUrl = URL.createObjectURL(blob);
+
+                        const a = document.createElement('a');
+                        a.href = dataUrl;
+                        a.download = 'image_' + Date.now() + '.png';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(dataUrl);
+                    } catch (fetchError) {
+                        // Fallback: open in new tab
+                        window.open(imageSrc, '_blank');
+                    }
+                } else {
+                    // Already a data URL (base64)
+                    const a = document.createElement('a');
+                    a.href = dataUrl;
+                    a.download = 'image_' + Date.now() + '.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+            } catch (error) {
+                console.error('Download failed:', error);
+                window.open(imageSrc, '_blank');
+            }
         };
 
         // Close button
         closeBtn.onclick = () => {
             modal.style.display = 'none';
-            currentZoom = 1;
-            previewImg.style.transform = 'scale(1)';
+            resetZoom();
         };
 
-        // Zoom controls
+        // Zoom controls (for desktop)
         zoomInBtn.onclick = () => {
-            currentZoom = Math.min(currentZoom + 0.2, 3);
-            previewImg.style.transform = `scale(${currentZoom})`;
+            currentScale = Math.min(currentScale + 0.3, 4);
+            updateTransform();
         };
 
         zoomOutBtn.onclick = () => {
-            currentZoom = Math.max(currentZoom - 0.2, 0.5);
-            previewImg.style.transform = `scale(${currentZoom})`;
+            currentScale = Math.max(currentScale - 0.3, 0.5);
+            if (currentScale <= 1) {
+                translateX = 0;
+                translateY = 0;
+            }
+            updateTransform();
         };
 
-        zoomResetBtn.onclick = () => {
-            currentZoom = 1;
-            previewImg.style.transform = 'scale(1)';
-        };
+        zoomResetBtn.onclick = resetZoom;
+
+        // Mouse wheel zoom (desktop)
+        const imageContent = document.querySelector('.image-preview-content');
+        if (imageContent) {
+            imageContent.onwheel = (e) => {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    currentScale = Math.min(currentScale + 0.15, 4);
+                } else {
+                    currentScale = Math.max(currentScale - 0.15, 0.5);
+                    if (currentScale <= 1) {
+                        translateX = 0;
+                        translateY = 0;
+                    }
+                }
+                updateTransform();
+            };
+        }
 
         // Close on background click
         modal.onclick = (e) => {
-            if (e.target === modal) {
+            if (e.target === modal || e.target.classList.contains('image-preview-content')) {
                 modal.style.display = 'none';
-                currentZoom = 1;
-                previewImg.style.transform = 'scale(1)';
+                resetZoom();
             }
         };
 
@@ -1655,8 +1797,7 @@ class RealtimeChat {
         const handleEscape = (e) => {
             if (e.key === 'Escape') {
                 modal.style.display = 'none';
-                currentZoom = 1;
-                previewImg.style.transform = 'scale(1)';
+                resetZoom();
                 document.removeEventListener('keydown', handleEscape);
             }
         };
