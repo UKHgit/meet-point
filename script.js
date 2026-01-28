@@ -844,7 +844,7 @@ class RealtimeChat {
         text.className = 'message-text';
 
         const escapedText = this.escapeHtml(messageText);
-        text.innerHTML = escapedText.replace(/@([\w-]+)/g, (match, name) => {
+        text.innerHTML = this.linkify(escapedText).replace(/@([\w-]+)/g, (match, name) => {
             if (name === this.username) {
                 return `<span class="mention-highlight me">${match}</span>`;
             }
@@ -897,7 +897,7 @@ class RealtimeChat {
 
             img.className = 'message-image';
             img.alt = 'Image';
-            img.style.cssText = 'width: 100%; max-width: 280px; display: block; border-radius: 12px;';
+            img.style.cssText = 'width: 100%; height: auto; display: block; border-radius: 12px;';
 
             img.onerror = () => {
                 imgContainer.innerHTML = '<div style="padding: 30px 20px; text-align: center; color: var(--text-muted);"><div style="font-size: 2rem; margin-bottom: 8px;">🖼️</div><div style="font-size: 0.75rem;">Failed to load</div></div>';
@@ -1403,36 +1403,31 @@ class RealtimeChat {
     }
 
     async uploadFile(file) {
-        console.log('Attempting file upload:', file.name, file.size);
+        console.log('Uploading file:', file.name, file.size);
 
-        // Try Imgur (most reliable for browser uploads)
+        // For images under 5MB, use instant base64 (no network delay)
+        if (file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024) {
+            try {
+                return await this.uploadAsBase64(file);
+            } catch (error) {
+                console.error('Base64 encoding failed:', error);
+            }
+        }
+
+        // For larger files, try remote upload services
         try {
             return await this.uploadToImgur(file);
         } catch (error) {
             console.error('Imgur upload failed:', error);
         }
 
-        // Fallback to ImgBB
         try {
             return await this.uploadToImgBB(file);
         } catch (error) {
             console.error('ImgBB upload failed:', error);
         }
 
-        // Fallback to file.io (simple, reliable)
-        try {
-            return await this.uploadToFileIO(file);
-        } catch (error) {
-            console.error('file.io upload failed:', error);
-        }
-
-        // Last resort: Base64 encoding (works offline too!)
-        try {
-            return await this.uploadAsBase64(file);
-        } catch (error) {
-            console.error('Base64 encoding failed:', error);
-            throw new Error('All upload methods failed');
-        }
+        throw new Error('All upload methods failed');
     }
 
     async uploadToImgur(file) {
@@ -1494,11 +1489,11 @@ class RealtimeChat {
     }
 
     async uploadAsBase64(file) {
-        console.log('Converting to Base64 for direct transmission...');
+        console.log('Encoding to Base64 (instant send)...');
         return new Promise((resolve, reject) => {
-            // Check file size - base64 increases size by ~33%
-            if (file.size > 2 * 1024 * 1024) { // 2MB limit for base64
-                reject(new Error('File too large for base64 (max 2MB)'));
+            // 5MB limit for base64 transmission
+            if (file.size > 5 * 1024 * 1024) {
+                reject(new Error('File too large for base64 (max 5MB)'));
                 return;
             }
 
@@ -1629,6 +1624,14 @@ class RealtimeChat {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    linkify(text) {
+        const urlPattern = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
+        return text.replace(urlPattern, (url) => {
+            const href = url.match(/^https?:\/\//i) ? url : `https://${url}`;
+            return `<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+        });
     }
 
     // Image Preview Modal with Pinch-to-Zoom (WhatsApp style)

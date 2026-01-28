@@ -92,7 +92,13 @@ body.theme-midnight {
 
 html {
     overflow-x: hidden;
-    max-width: 100vw;
+    width: 100%;
+    position: relative;
+}
+
+body {
+    overflow-x: hidden;
+    width: 100%;
 }
 
 * {
@@ -623,12 +629,28 @@ body.theme-midnight {
 }
 
 .message-text {
-    color: var(--text-primary);
+    color: rgba(255, 255, 255, 0.95);
     line-height: 1.5;
     word-wrap: break-word;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     padding: 0.875rem 1.25rem;
     border-radius: 20px;
     position: relative;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.message-text a {
+    color: var(--primary-light);
+    text-decoration: underline;
+    word-break: break-all;
+    transition: var(--transition);
+}
+
+.message-text a:hover {
+    color: white;
 }
 
 .message.sent .message-text {
@@ -639,9 +661,10 @@ body.theme-midnight {
 }
 
 .message.received .message-text {
-    background: var(--bg-card);
+    background: rgba(30, 30, 35, 0.95);
     border: 1px solid var(--border-color);
     border-bottom-left-radius: 6px;
+    color: rgba(255, 255, 255, 0.95);
 }
 
 /* Message Reply */
@@ -676,9 +699,13 @@ body.theme-midnight {
 
 .message-reply .reply-text {
     color: rgba(255, 255, 255, 0.7);
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
     overflow: hidden;
     text-overflow: ellipsis;
+    word-break: break-word;
     margin-left: 0;
 }
 
@@ -1731,6 +1758,7 @@ textarea:focus-visible {
         height: 100%;
         height: 100dvh;
         height: -webkit-fill-available;
+        width: 100%;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -1738,6 +1766,7 @@ textarea:focus-visible {
 
     .main {
         flex: 1;
+        width: 100%;
         min-height: 0;
         display: flex;
         overflow: hidden;
