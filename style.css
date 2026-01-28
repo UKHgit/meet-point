@@ -118,49 +118,49 @@ body {
 
 /* WhatsApp Dark Theme - Dark Forest Background */
 body.theme-whatsapp-dark {
-    background-image: 
+    background-image:
         linear-gradient(135deg, rgba(11, 20, 26, 0.8), rgba(0, 168, 132, 0.3)),
         url('https://images.unsplash.com/photo-1511497584788-876760111969?w=1920&q=80');
 }
 
 /* Default Purple Theme - Purple Space/Nebula Background */
 body.theme-default {
-    background-image: 
+    background-image:
         linear-gradient(135deg, rgba(15, 15, 26, 0.7), rgba(139, 92, 246, 0.2)),
         url('https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920&q=80');
 }
 
 /* WhatsApp Light Theme - Light Sky Background */
 body.theme-whatsapp-light {
-    background-image: 
+    background-image:
         linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(0, 160, 132, 0.15)),
         url('https://images.unsplash.com/photo-1495567720989-cebdbdd97913?w=1920&q=80');
 }
 
 /* Ocean Theme - Deep Blue Ocean Background */
 body.theme-ocean {
-    background-image: 
+    background-image:
         linear-gradient(135deg, rgba(8, 47, 73, 0.85), rgba(14, 165, 233, 0.3)),
         url('https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=1920&q=80');
 }
 
 /* Emerald Theme - Lush Green Forest Background */
 body.theme-emerald {
-    background-image: 
+    background-image:
         linear-gradient(135deg, rgba(6, 78, 59, 0.8), rgba(16, 185, 129, 0.25)),
         url('https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80');
 }
 
 /* Crimson Theme - Red Sunset Background */
 body.theme-crimson {
-    background-image: 
+    background-image:
         linear-gradient(135deg, rgba(76, 5, 25, 0.85), rgba(225, 29, 72, 0.3)),
         url('https://images.unsplash.com/photo-1495567720989-cebdbdd97913?w=1920&q=80&blend=https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=1920&q=80');
 }
 
 /* Midnight Theme - Night Sky with Stars Background */
 body.theme-midnight {
-    background-image: 
+    background-image:
         linear-gradient(135deg, rgba(2, 6, 23, 0.9), rgba(99, 102, 241, 0.2)),
         url('https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=1920&q=80');
 }
@@ -185,7 +185,7 @@ body.theme-midnight {
     .mobile-header {
         display: none !important;
     }
-    
+
     .menu-toggle {
         display: none !important;
     }
@@ -194,14 +194,14 @@ body.theme-midnight {
 
 /* Desktop Header */
 .header {
-    background: var(--bg-card);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 1rem 1.5rem;
+    background: var(--bg-dark);
+    padding: 0.75rem 1.5rem;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-shrink: 0;
+    height: auto;
 }
 
 .credits {
@@ -226,7 +226,7 @@ body.theme-midnight {
 }
 
 .header h1 {
-    font-size: 1.5rem;
+    font-size: 1.2rem;
     font-weight: 700;
     background: linear-gradient(135deg, var(--primary), var(--secondary));
     -webkit-background-clip: text;
@@ -234,12 +234,13 @@ body.theme-midnight {
     background-clip: text;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.4rem;
+    margin: 0;
 }
 
 .header h1::before {
     content: '💬';
-    font-size: 1.3rem;
+    font-size: 1rem;
 }
 
 .room-info {
@@ -1219,20 +1220,19 @@ body.theme-midnight {
     border-color: rgba(255, 255, 255, 0.5);
     transform: translateY(-2px);
 }
-    object-fit: contain;
+
+object-fit: contain;
 }
 
 
 /* Mobile Header */
 .mobile-header {
     display: none;
-    background: var(--bg-card);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    padding: 0.875rem 1rem;
+    background: var(--bg-dark);
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid var(--border-color);
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     position: sticky;
     top: 0;
     z-index: 999;
@@ -1308,8 +1308,7 @@ body.theme-midnight {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        height: 60px;
-        /* Explicit height for stability */
+        height: 48px;
         flex-shrink: 0;
     }
 
@@ -1708,14 +1707,34 @@ textarea:focus-visible {
 }
 
 @media (max-width: 768px) {
-    .chat-container {
-        height: auto !important;
+    .container {
+        height: 100vh;
+        height: 100dvh;
+        max-height: -webkit-fill-available;
+    }
+
+    .main {
         flex: 1;
+        min-height: 0;
+    }
+
+    .chat-container {
+        height: 100%;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
         overflow: hidden;
     }
 
     .messages {
-        padding-bottom: 20px;
+        padding-bottom: 10px;
         flex: 1;
+        min-height: 0;
+    }
+
+    .input-area {
+        flex-shrink: 0;
+        margin-bottom: 0;
+        padding-bottom: env(safe-area-inset-bottom, 0.35rem);
     }
 }
