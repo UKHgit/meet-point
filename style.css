@@ -190,7 +190,6 @@ body.theme-midnight {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: var(--shadow-glow);
 }
 
 .credits {
