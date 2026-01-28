@@ -753,6 +753,10 @@ class RealtimeChat {
         if (this.elements.replyPreview) {
             this.elements.replyPreview.style.display = 'none';
         }
+
+        // Clear typing indicator immediately
+        this.typingUsers.delete(this.username);
+        this.updateTypingUI();
     }
 
     addMessage(data, isSent, isHistory = false) {
@@ -1093,7 +1097,8 @@ class RealtimeChat {
     // Typing Indicator Logic
     sendTyping() {
         const now = Date.now();
-        if (now - this.lastTypingSent > 3000 && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        // Send typing every 1.5 seconds instead of 3
+        if (now - this.lastTypingSent > 1500 && this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.lastTypingSent = now;
             this.ws.send(JSON.stringify({
                 cmd: 'chat',
@@ -1108,14 +1113,14 @@ class RealtimeChat {
         this.typingUsers.set(username, Date.now());
         this.updateTypingUI();
 
-        // Clear after 4 seconds if no new updates
+        // Clear after 2.5 seconds if no new updates (faster response)
         setTimeout(() => {
             const lastTime = this.typingUsers.get(username);
-            if (Date.now() - lastTime >= 4000) {
+            if (lastTime && Date.now() - lastTime >= 2500) {
                 this.typingUsers.delete(username);
                 this.updateTypingUI();
             }
-        }, 4100);
+        }, 2600);
     }
 
     updateTypingUI() {
@@ -1129,14 +1134,17 @@ class RealtimeChat {
             return;
         }
 
-        indicator.style.display = 'block';
-        if (users.length === 1) {
-            indicator.textContent = `${users[0]} is typing...`;
-        } else if (users.length === 2) {
-            indicator.textContent = `${users[0]} and ${users[1]} are typing...`;
-        } else {
-            indicator.textContent = `${users.length} users are typing...`;
-        }
+        // Use requestAnimationFrame for immediate UI update
+        requestAnimationFrame(() => {
+            indicator.style.display = 'block';
+            if (users.length === 1) {
+                indicator.textContent = `${users[0]} is typing...`;
+            } else if (users.length === 2) {
+                indicator.textContent = `${users[0]} and ${users[1]} are typing...`;
+            } else {
+                indicator.textContent = `${users.length} users are typing...`;
+            }
+        });
     }
 
     // Theme Logic
@@ -1305,29 +1313,73 @@ class RealtimeChat {
         formData.append('fileToUpload', file);
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
             const response = await fetch('https://catbox.moe/user/api.php', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             const data = await response.text();
 
             if (!response.ok) {
-                console.error('Catbox API error response:', data);
-                throw new Error('Upload failed: ' + data);
+                console.error('Catbox API error:', data);
+                // Fallback to alternative service
+                return await this.uploadFileToAnonFiles(file);
             }
 
             // Catbox returns the direct URL as plain text
             const fileUrl = data.trim();
             
             if (!fileUrl.startsWith('http')) {
-                throw new Error('Invalid response from upload service');
+                throw new Error('Invalid response');
             }
 
             console.log('Catbox upload successful:', fileUrl);
             return fileUrl;
         } catch (error) {
-            console.error('Fetch error during upload:', error);
+            console.error('Catbox upload failed:', error);
+            // Fallback to alternative service
+            try {
+                return await this.uploadFileToAnonFiles(file);
+            } catch (fallbackError) {
+                console.error('All upload methods failed:', fallbackError);
+                throw new Error('Upload failed: ' + fallbackError.message);
+            }
+        }
+    }
+
+    async uploadFileToAnonFiles(file) {
+        console.log('Fallback upload to AnonFiles:', file.name);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+            const response = await fetch('https://api.anonfiles.com/upload', {
+                method: 'POST',
+                body: formData,
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+            const data = await response.json();
+
+            if (data.status === true && data.data && data.data.file) {
+                const fileUrl = data.data.file.url.full;
+                console.log('AnonFiles upload successful:', fileUrl);
+                return fileUrl;
+            } else {
+                throw new Error('Upload failed: Invalid response');
+            }
+        } catch (error) {
+            console.error('AnonFiles upload failed:', error);
             throw error;
         }
     }
