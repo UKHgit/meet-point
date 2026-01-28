@@ -194,20 +194,24 @@ body.theme-midnight {
 }
 
 .credits {
-    font-size: 0.75rem;
-    color: var(--text-muted);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
     margin-top: -5px;
     margin-left: 2rem;
+    font-weight: 500;
+    opacity: 0.9;
 }
 
 .credits a {
-    color: var(--secondary);
+    color: var(--primary);
     text-decoration: none;
-    font-weight: 500;
+    font-weight: 600;
+    transition: var(--transition);
 }
 
 .credits a:hover {
     text-decoration: underline;
+    opacity: 1;
 }
 
 .header h1 {
@@ -1212,9 +1216,11 @@ body.theme-midnight {
     }
 
     .mobile-credits {
-        font-size: 0.7rem;
-        color: var(--text-muted);
+        font-size: 0.75rem;
+        color: var(--text-secondary);
         margin-top: -2px;
+        font-weight: 500;
+        opacity: 0.9;
     }
 
     .message {

@@ -859,12 +859,82 @@ class RealtimeChat {
         }
 
         if (data.text.startsWith('__IMG__:')) {
+            const url = data.text.substring(8);
             const img = document.createElement('img');
-            img.src = data.text.substring(8);
+            
+            // Handle base64 files from sessionStorage
+            if (url.startsWith('base64:')) {
+                const [, fileId] = url.split(':');
+                const base64Data = sessionStorage.getItem(fileId);
+                img.src = base64Data;
+            } else {
+                img.src = url;
+            }
+            
             img.className = 'message-image';
             img.alt = 'Image';
-            img.onclick = () => window.open(img.src);
+            img.style.maxWidth = '100%';
+            img.style.borderRadius = '10px';
+            img.style.cursor = 'pointer';
+            img.onclick = () => {
+                const a = document.createElement('a');
+                a.href = img.src;
+                a.download = 'image';
+                a.click();
+            };
             content.appendChild(img);
+        } else if (data.text.startsWith('__VIDEO__:') || data.text.startsWith('__AUDIO__:') || data.text.startsWith('__FILE__:')) {
+            // Handle video, audio, and file attachments
+            const [prefix, urlAndName] = data.text.split(':');
+            const [url, fileName] = urlAndName.split('|');
+            
+            const mediaContainer = document.createElement('div');
+            mediaContainer.className = 'message-media';
+            mediaContainer.style.padding = '10px';
+            mediaContainer.style.background = 'rgba(0,0,0,0.1)';
+            mediaContainer.style.borderRadius = '8px';
+            
+            if (prefix === '__VIDEO__') {
+                const video = document.createElement('video');
+                if (url.startsWith('base64:')) {
+                    const fileId = url.split(':')[1];
+                    const base64Data = sessionStorage.getItem(fileId);
+                    video.src = base64Data;
+                } else {
+                    video.src = url;
+                }
+                video.controls = true;
+                video.style.maxWidth = '100%';
+                video.style.borderRadius = '8px';
+                mediaContainer.appendChild(video);
+            } else if (prefix === '__AUDIO__') {
+                const audio = document.createElement('audio');
+                if (url.startsWith('base64:')) {
+                    const fileId = url.split(':')[1];
+                    const base64Data = sessionStorage.getItem(fileId);
+                    audio.src = base64Data;
+                } else {
+                    audio.src = url;
+                }
+                audio.controls = true;
+                audio.style.width = '100%';
+                mediaContainer.appendChild(audio);
+            } else {
+                // Regular file download
+                const link = document.createElement('a');
+                link.href = url.startsWith('base64:') ? sessionStorage.getItem(url.split(':')[1]) : url;
+                link.className = 'file-link';
+                link.style.display = 'flex';
+                link.style.alignItems = 'center';
+                link.style.gap = '10px';
+                link.style.padding = '10px';
+                link.style.color = 'var(--primary)';
+                link.style.textDecoration = 'none';
+                link.download = fileName || 'file';
+                link.innerHTML = `📎 ${fileName || 'Download File'}`;
+                mediaContainer.appendChild(link);
+            }
+            content.appendChild(mediaContainer);
         } else {
             content.appendChild(text);
         }
@@ -1307,111 +1377,110 @@ class RealtimeChat {
     }
 
     async uploadFile(file) {
-        console.log('Attempting upload to Transfer.sh:', file.name, file.size);
-        const formData = new FormData();
-        formData.append('file', file);
-
+        console.log('Attempting file upload:', file.name, file.size);
+        
+        // Try Imgur (most reliable for browser uploads)
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
-
-            // Try Transfer.sh (open source, completely free)
-            const response = await fetch('https://transfer.sh/', {
-                method: 'POST',
-                body: formData,
-                signal: controller.signal,
-                headers: {
-                    'Max-Days': '30'
-                }
-            });
-
-            clearTimeout(timeoutId);
-
-            if (response.ok) {
-                const fileUrl = (await response.text()).trim();
-                console.log('Transfer.sh upload successful:', fileUrl);
-                return fileUrl;
-            } else {
-                throw new Error('Transfer.sh failed');
-            }
+            return await this.uploadToImgur(file);
         } catch (error) {
-            console.error('Transfer.sh upload failed:', error);
-            // Fallback to Catbox
-            try {
-                return await this.uploadFileToCatbox(file);
-            } catch (fallbackError) {
-                console.error('Catbox fallback failed:', fallbackError);
-                // Final fallback to AnonFiles
-                try {
-                    return await this.uploadFileToAnonFiles(file);
-                } catch (finalError) {
-                    console.error('All upload methods failed:', finalError);
-                    throw new Error('Upload failed: ' + finalError.message);
-                }
-            }
+            console.error('Imgur upload failed:', error);
+        }
+
+        // Fallback to ImgBB
+        try {
+            return await this.uploadToImgBB(file);
+        } catch (error) {
+            console.error('ImgBB upload failed:', error);
+        }
+
+        // Fallback to file.io (simple, reliable)
+        try {
+            return await this.uploadToFileIO(file);
+        } catch (error) {
+            console.error('file.io upload failed:', error);
+        }
+
+        // Last resort: Base64 encoding (works offline too!)
+        try {
+            return await this.uploadAsBase64(file);
+        } catch (error) {
+            console.error('Base64 encoding failed:', error);
+            throw new Error('All upload methods failed');
         }
     }
 
-    async uploadFileToCatbox(file) {
-        console.log('Fallback upload to Catbox:', file.name);
+    async uploadToImgur(file) {
+        console.log('Trying Imgur upload...');
         const formData = new FormData();
-        formData.append('reqtype', 'fileupload');
-        formData.append('fileToUpload', file);
+        formData.append('image', file);
 
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-            const response = await fetch('https://catbox.moe/user/api.php', {
-                method: 'POST',
-                body: formData,
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-            const data = await response.text();
-
-            if (!response.ok || !data.trim().startsWith('http')) {
-                throw new Error('Catbox upload failed');
+        const response = await fetch('https://api.imgur.com/3/image', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Authorization': 'Client-ID 515fda83da0e285'
             }
+        });
 
-            console.log('Catbox upload successful:', data.trim());
-            return data.trim();
-        } catch (error) {
-            console.error('Catbox upload failed:', error);
-            throw error;
+        const data = await response.json();
+        if (data.success && data.data.link) {
+            console.log('Imgur upload successful');
+            return data.data.link;
         }
+        throw new Error('Imgur API error');
     }
 
-    async uploadFileToAnonFiles(file) {
-        console.log('Fallback upload to AnonFiles:', file.name);
+    async uploadToImgBB(file) {
+        console.log('Trying ImgBB upload...');
+        const apiKey = '5bb25da16b6754021200388d22797e88';
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await response.json();
+        if (data.success && data.data.url) {
+            console.log('ImgBB upload successful');
+            return data.data.url;
+        }
+        throw new Error('ImgBB API error');
+    }
+
+    async uploadToFileIO(file) {
+        console.log('Trying file.io upload...');
         const formData = new FormData();
         formData.append('file', file);
 
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch('https://file.io/', {
+            method: 'POST',
+            body: formData
+        });
 
-            const response = await fetch('https://api.anonfiles.com/upload', {
-                method: 'POST',
-                body: formData,
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-            const data = await response.json();
-
-            if (data.status === true && data.data && data.data.file) {
-                const fileUrl = data.data.file.url.full;
-                console.log('AnonFiles upload successful:', fileUrl);
-                return fileUrl;
-            } else {
-                throw new Error('Upload failed: Invalid response');
-            }
-        } catch (error) {
-            console.error('AnonFiles upload failed:', error);
-            throw error;
+        const data = await response.json();
+        if (data.success && data.link) {
+            console.log('file.io upload successful');
+            return data.link;
         }
+        throw new Error('file.io API error');
+    }
+
+    async uploadAsBase64(file) {
+        console.log('Converting to Base64...');
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64 = reader.result;
+                const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                sessionStorage.setItem(fileId, base64);
+                console.log('Base64 encoding successful, file stored in session');
+                resolve('base64:' + fileId + ':' + file.name);
+            };
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+        });
     }
 
     sendFile(url, fileName, fileType) {
