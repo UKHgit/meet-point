@@ -1185,8 +1185,8 @@ class RealtimeChat {
     // Typing Indicator Logic
     sendTyping() {
         const now = Date.now();
-        // Send typing every 0.8 seconds instead of 1.5 for more real-time feel
-        if (now - this.lastTypingSent > 800 && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        // Send typing every 2 seconds to avoid server rate-limiting/spam protection
+        if (now - this.lastTypingSent > 2000 && this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.lastTypingSent = now;
             this.ws.send(JSON.stringify({
                 cmd: 'chat',
