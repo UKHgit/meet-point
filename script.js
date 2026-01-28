@@ -162,7 +162,30 @@ class RealtimeChat {
         }
 
         if (this.elements.imageInput) {
-            this.elements.imageInput.addEventListener('change', (e) => this.handleImageSelect(e));
+            this.elements.imageInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        }
+
+        // Drag and drop support
+        if (this.elements.messages) {
+            this.elements.messages.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.elements.messages.style.background = 'rgba(139, 92, 246, 0.2)';
+            });
+
+            this.elements.messages.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                this.elements.messages.style.background = '';
+            });
+
+            this.elements.messages.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.elements.messages.style.background = '';
+                if (e.dataTransfer.files.length > 0) {
+                    this.handleFileSelect({ target: { files: e.dataTransfer.files } });
+                }
+            });
         }
 
         if (this.elements.emojiBtn) {
@@ -471,7 +494,7 @@ class RealtimeChat {
         // Filter unwanted system messages
         if (data.text) {
             const lowerText = data.text.toLowerCase();
-            const blocked = ['hack.chat', 'patreon', 'support us', 'funny.io'];
+            const blocked = ['hack.chat', 'patreon', 'support us', 'funny.io', 'twitter', 'x.com', 'hackdotchat'];
             if (blocked.some(k => lowerText.includes(k))) {
                 console.log('Filtered message:', data.text);
                 return;
@@ -483,7 +506,6 @@ class RealtimeChat {
                 this.users = data.nicks || [];
                 this.updateUserList();
                 this.updateStatus('Connected', 'connected');
-                this.addSystemMessage(`You joined "${this.currentRoom}" as ${this.username}`);
                 this.addSystemMessage('📎 Share this page URL to invite others!');
 
                 // Safe to request history now that we are joined
@@ -549,15 +571,15 @@ class RealtimeChat {
                 break;
 
             case 'info':
-                this.addSystemMessage(data.text || 'Info');
+                // Skip info messages - only show join/leave
                 break;
 
             case 'warn':
-                this.addSystemMessage('⚠️ ' + (data.text || 'Warning'));
+                // Skip warn messages
                 break;
 
             case 'emote':
-                this.addSystemMessage(`* ${data.nick} ${data.text}`);
+                // Skip emote messages
                 break;
 
             default:
@@ -1255,60 +1277,77 @@ class RealtimeChat {
     }
 
     // Image Handling Logic
-    async handleImageSelect(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+    async handleFileSelect(event) {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
 
-        if (!file.type.startsWith('image/')) {
-            this.addSystemMessage('Please select an image file.');
-            return;
+        for (let file of files) {
+            try {
+                this.addSystemMessage(`Uploading ${file.name}...`);
+                const fileUrl = await this.uploadFile(file);
+                this.sendFile(fileUrl, file.name, file.type);
+            } catch (error) {
+                console.error('File upload failed:', error);
+                this.addSystemMessage(`Failed to upload ${file.name}. Please try again.`);
+            }
         }
-
-        try {
-            this.addSystemMessage('Uploading image...');
-            const imageUrl = await this.uploadToImgBB(file);
-            this.sendImage(imageUrl);
-        } catch (error) {
-            console.error('Image upload failed:', error);
-            this.addSystemMessage('Failed to upload image. Please try again.');
-        } finally {
-            event.target.value = ''; // Reset input
+        
+        // Reset input
+        if (event.target.value) {
+            event.target.value = '';
         }
     }
 
-    async uploadToImgBB(file) {
-        console.log('Attempting upload to ImgBB:', file.name, file.size);
-        const apiKey = '5bb25da16b6754021200388d22797e88'; // Publicly available demo key
+    async uploadFile(file) {
+        console.log('Attempting upload to Catbox:', file.name, file.size);
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('reqtype', 'fileupload');
+        formData.append('fileToUpload', file);
 
         try {
-            const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+            const response = await fetch('https://catbox.moe/user/api.php', {
                 method: 'POST',
                 body: formData
             });
 
-            const data = await response.json();
+            const data = await response.text();
 
             if (!response.ok) {
-                console.error('ImgBB API error response:', data);
-                throw new Error(data.error ? data.error.message : 'Upload failed');
+                console.error('Catbox API error response:', data);
+                throw new Error('Upload failed: ' + data);
             }
 
-            console.log('ImgBB upload successful:', data.data.url);
-            return data.data.url;
+            // Catbox returns the direct URL as plain text
+            const fileUrl = data.trim();
+            
+            if (!fileUrl.startsWith('http')) {
+                throw new Error('Invalid response from upload service');
+            }
+
+            console.log('Catbox upload successful:', fileUrl);
+            return fileUrl;
         } catch (error) {
-            console.error('Fetch error during ImgBB upload:', error);
+            console.error('Fetch error during upload:', error);
             throw error;
         }
     }
 
-    sendImage(url) {
+    sendFile(url, fileName, fileType) {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+
+        // Determine file type prefix
+        let prefix = '__FILE__';
+        if (fileType.startsWith('image/')) {
+            prefix = '__IMG__';
+        } else if (fileType.startsWith('video/')) {
+            prefix = '__VIDEO__';
+        } else if (fileType.startsWith('audio/')) {
+            prefix = '__AUDIO__';
+        }
 
         this.ws.send(JSON.stringify({
             cmd: 'chat',
-            text: `__IMG__:${url}`
+            text: `${prefix}:${url}|${fileName}`
         }));
     }
 
