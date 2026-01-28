@@ -1,0 +1,28 @@
+{
+  "name": "realtime-chat",
+  "version": "1.0.0",
+  "description": "A real-time chat application with no database required - Netlify compatible",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:3001": "PORT=3001 node server.js",
+    "dev": "node server.js",
+    "build": "echo 'No build step required'",
+    "netlify-build": "echo 'Ready for Netlify deployment'"
+  },
+  "keywords": [
+    "chat",
+    "realtime",
+    "nodejs",
+    "netlify",
+    "serverless"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
