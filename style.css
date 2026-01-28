@@ -1403,30 +1403,6 @@ textarea:focus-visible {
     background: var(--primary-color);
 }
 
-/* Layout Fixes for Mobile & Flexbox */
-.chat-container {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    flex: 1;
-    height: 0;
-    /* Important for flex-grow to work without popping out */
-}
-
-.messages {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
-    padding-bottom: 20px;
-}
-
-.input-area {
-    flex-shrink: 0;
-    position: relative;
-    z-index: 10;
-    background: var(--bg-dark);
-}
 
 .mobile-header {
     flex-shrink: 0;
