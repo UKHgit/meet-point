@@ -860,40 +860,55 @@ class RealtimeChat {
 
         if (data.text.startsWith('__IMG__:')) {
             const urlPart = data.text.substring(8);
-            // Handle format: url|filename
+            // Handle format: url|filename or just url
             const [rawUrl] = urlPart.split('|');
             const url = rawUrl.trim();
+
+            // Create WhatsApp-style image container
+            const imgContainer = document.createElement('div');
+            imgContainer.className = 'message-image-container';
+            imgContainer.style.cssText = 'max-width: 280px; border-radius: 12px; overflow: hidden; cursor: pointer; position: relative; background: rgba(0,0,0,0.1);';
+
             const img = document.createElement('img');
 
-            // Handle base64 files from sessionStorage
-            if (url.startsWith('base64:')) {
+            // Handle different URL formats
+            if (url.startsWith('data:image')) {
+                // Direct base64 data URL
+                img.src = url;
+            } else if (url.startsWith('base64:')) {
+                // Legacy: sessionStorage reference (sender only)
                 const parts = url.split(':');
                 const fileId = parts[1];
                 const base64Data = sessionStorage.getItem(fileId);
                 if (base64Data) {
                     img.src = base64Data;
                 } else {
-                    img.alt = 'Image expired';
-                    img.style.padding = '20px';
-                    img.style.background = 'rgba(0,0,0,0.2)';
+                    // Base64 reference not found - show placeholder
+                    img.src = '';
+                    imgContainer.innerHTML = '<div style="padding: 30px 20px; text-align: center; color: var(--text-muted);"><div style="font-size: 2rem; margin-bottom: 8px;">🖼️</div><div style="font-size: 0.75rem;">Image not available</div></div>';
+                    content.appendChild(imgContainer);
+                    // Skip rest of image setup
+                    return;
                 }
             } else {
+                // Remote URL (http/https)
                 img.src = url;
             }
 
             img.className = 'message-image';
             img.alt = 'Image';
-            img.style.maxWidth = '100%';
-            img.style.borderRadius = '10px';
-            img.style.cursor = 'pointer';
+            img.style.cssText = 'width: 100%; max-width: 280px; display: block; border-radius: 12px;';
+
             img.onerror = () => {
-                img.alt = 'Failed to load image';
-                img.style.padding = '15px';
-                img.style.background = 'rgba(0,0,0,0.2)';
-                img.style.border = '1px dashed var(--border-color)';
+                imgContainer.innerHTML = '<div style="padding: 30px 20px; text-align: center; color: var(--text-muted);"><div style="font-size: 2rem; margin-bottom: 8px;">🖼️</div><div style="font-size: 0.75rem;">Failed to load</div></div>';
             };
-            img.onclick = () => this.openImagePreview(img.src);
-            content.appendChild(img);
+
+            imgContainer.onclick = () => {
+                if (img.src) this.openImagePreview(img.src);
+            };
+
+            imgContainer.appendChild(img);
+            content.appendChild(imgContainer);
         } else if (data.text.startsWith('__VIDEO__:') || data.text.startsWith('__AUDIO__:') || data.text.startsWith('__FILE__:')) {
             // Handle video, audio, and file attachments
             const [prefix, urlAndName] = data.text.split(':');
@@ -1479,15 +1494,20 @@ class RealtimeChat {
     }
 
     async uploadAsBase64(file) {
-        console.log('Converting to Base64...');
+        console.log('Converting to Base64 for direct transmission...');
         return new Promise((resolve, reject) => {
+            // Check file size - base64 increases size by ~33%
+            if (file.size > 2 * 1024 * 1024) { // 2MB limit for base64
+                reject(new Error('File too large for base64 (max 2MB)'));
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = () => {
-                const base64 = reader.result;
-                const fileId = 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                sessionStorage.setItem(fileId, base64);
-                console.log('Base64 encoding successful, file stored in session');
-                resolve('base64:' + fileId + ':' + file.name);
+                const base64Data = reader.result; // This is the full data:image/xxx;base64,xxxx string
+                console.log('Base64 encoding successful, sending directly');
+                // Return the full base64 data URL directly (not a reference)
+                resolve(base64Data);
             };
             reader.onerror = () => reject(new Error('Failed to read file'));
             reader.readAsDataURL(file);
@@ -1706,34 +1726,56 @@ class RealtimeChat {
         // Download button - handles both remote and base64 images
         downloadBtn.onclick = async () => {
             try {
-                let dataUrl = imageSrc;
+                // Handle base64 data URLs
+                if (imageSrc.startsWith('data:')) {
+                    // Extract mime type and convert to blob
+                    const mimeMatch = imageSrc.match(/data:([^;]+);base64,/);
+                    const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
+                    const extension = mimeType.split('/')[1] || 'png';
 
-                // If it's a remote URL, fetch and convert to blob
-                if (imageSrc.startsWith('http')) {
+                    // Convert base64 to blob
+                    const base64Data = imageSrc.split(',')[1];
+                    const binaryString = atob(base64Data);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    const blob = new Blob([bytes], { type: mimeType });
+
+                    // Download the blob
+                    const blobUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = 'image_' + Date.now() + '.' + extension;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(blobUrl);
+                } else if (imageSrc.startsWith('http')) {
+                    // Remote URL - fetch and convert to blob
                     try {
                         const response = await fetch(imageSrc);
                         const blob = await response.blob();
-                        dataUrl = URL.createObjectURL(blob);
+                        const blobUrl = URL.createObjectURL(blob);
+
+                        // Get extension from URL or default to png
+                        const urlExt = imageSrc.split('.').pop().split('?')[0];
+                        const ext = ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(urlExt) ? urlExt : 'png';
 
                         const a = document.createElement('a');
-                        a.href = dataUrl;
-                        a.download = 'image_' + Date.now() + '.png';
+                        a.href = blobUrl;
+                        a.download = 'image_' + Date.now() + '.' + ext;
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
-                        URL.revokeObjectURL(dataUrl);
+                        URL.revokeObjectURL(blobUrl);
                     } catch (fetchError) {
                         // Fallback: open in new tab
                         window.open(imageSrc, '_blank');
                     }
                 } else {
-                    // Already a data URL (base64)
-                    const a = document.createElement('a');
-                    a.href = dataUrl;
-                    a.download = 'image_' + Date.now() + '.png';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
+                    // Unknown format - open in new tab
+                    window.open(imageSrc, '_blank');
                 }
             } catch (error) {
                 console.error('Download failed:', error);
