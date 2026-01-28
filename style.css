@@ -364,7 +364,8 @@ body.theme-midnight {
 /* User Section */
 .user-info {
     display: flex;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 .user-info input {
@@ -1355,7 +1356,7 @@ body.theme-midnight {
 
 .theme-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 0.75rem;
     margin-top: 1rem;
 }
@@ -1518,7 +1519,8 @@ textarea:focus-visible {
 
 .share-link-container {
     display: flex;
-    gap: 0.5rem;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
 .share-link-container input {
