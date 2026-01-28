@@ -583,6 +583,18 @@ body.theme-midnight {
     }
 }
 
+.message {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1rem;
+    max-width: 80%;
+    animation: messageIn 0.3s ease-out;
+    min-width: 0;
+    /* Critical for wrapping */
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+}
+
 .message.sent {
     align-self: flex-end;
     align-items: flex-end;
@@ -597,6 +609,8 @@ body.theme-midnight {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    min-width: 0;
+    align-items: inherit;
 }
 
 .message-header {
@@ -607,15 +621,17 @@ body.theme-midnight {
 }
 
 .message-username {
-    font-weight: 600;
+    font-weight: 700;
     color: var(--primary-light);
     font-size: 0.85rem;
     cursor: pointer;
     transition: var(--transition);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .message-username:hover {
-    color: var(--primary);
+    color: var(--primary-light);
+    filter: brightness(1.2);
 }
 
 .message-time {
@@ -633,13 +649,24 @@ body.theme-midnight {
     line-height: 1.5;
     word-wrap: break-word;
     overflow-wrap: anywhere;
-    word-break: break-word;
+    word-break: break-all;
+    /* Fallback for extreme cases */
     padding: 0.875rem 1.25rem;
     border-radius: 20px;
     position: relative;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
     box-sizing: border-box;
     max-width: 100%;
+    width: auto;
+    min-width: 0;
+}
+
+.message.sent .message-text {
+    align-self: flex-end;
+}
+
+.message.received .message-text {
+    align-self: flex-start;
 }
 
 .message-text a {
@@ -661,17 +688,21 @@ body.theme-midnight {
 }
 
 .message.received .message-text {
-    background: rgba(30, 30, 35, 0.95);
+    background: rgba(30, 30, 35, 0.92);
+    backdrop-filter: blur(8px);
     border: 1px solid var(--border-color);
     border-bottom-left-radius: 6px;
     color: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 /* Message Reply */
 /* Message Reply - WhatsApp Style */
 .message-reply {
-    background: rgba(0, 0, 0, 0.2);
-    border-left: 4px solid var(--secondary);
+    background: rgba(255, 255, 255, 0.08);
+    /* Brighter for all themes */
+    border-left: 4px solid var(--primary-light);
+    /* Brighter border */
     padding: 0.5rem 0.75rem;
     margin: 0.2rem 0.2rem 0.5rem 0.2rem;
     border-radius: 4px;
@@ -688,9 +719,11 @@ body.theme-midnight {
 }
 
 .message-reply .reply-tag {
-    color: var(--secondary);
+    color: var(--primary-light);
+    /* High contrast */
     font-weight: 700;
     font-size: 0.75rem;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 .message.sent .message-reply .reply-tag {
@@ -1370,6 +1403,7 @@ body.theme-midnight {
         display: flex;
         flex-direction: column;
         width: 100%;
+        max-width: 100vw;
         overflow: hidden;
         /* Prevent horizontal scroll */
     }
@@ -1380,6 +1414,8 @@ body.theme-midnight {
         min-height: 0;
         /* Critical for flex scrolling */
         overflow-y: auto;
+        overflow-x: hidden;
+        width: 100%;
         overscroll-behavior-y: contain;
         -webkit-overflow-scrolling: touch;
     }
@@ -1400,6 +1436,9 @@ body.theme-midnight {
 
     .message {
         max-width: 85%;
+        width: auto;
+        word-wrap: break-word;
+        overflow-wrap: anywhere;
     }
 
     .input-area {

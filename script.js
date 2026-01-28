@@ -491,15 +491,7 @@ class RealtimeChat {
     }
 
     handleMessage(data) {
-        // Filter unwanted system messages
-        if (data.text) {
-            const lowerText = data.text.toLowerCase();
-            const blocked = ['hack.chat', 'patreon', 'support us', 'funny.io', 'twitter', 'x.com', 'hackdotchat'];
-            if (blocked.some(k => lowerText.includes(k))) {
-                console.log('Filtered message:', data.text);
-                return;
-            }
-        }
+        // Removed aggressive filtering to prevent vanishing messages
 
         switch (data.cmd) {
             case 'onlineSet':
@@ -867,7 +859,7 @@ class RealtimeChat {
             // Create WhatsApp-style image container
             const imgContainer = document.createElement('div');
             imgContainer.className = 'message-image-container';
-            imgContainer.style.cssText = 'max-width: 280px; border-radius: 12px; overflow: hidden; cursor: pointer; position: relative; background: rgba(0,0,0,0.1);';
+            imgContainer.style.cssText = 'width: 100%; max-width: 280px; border-radius: 12px; overflow: hidden; cursor: pointer; position: relative; background: rgba(0,0,0,0.1); box-sizing: border-box;';
 
             const img = document.createElement('img');
 
@@ -1193,8 +1185,8 @@ class RealtimeChat {
     // Typing Indicator Logic
     sendTyping() {
         const now = Date.now();
-        // Send typing every 1.5 seconds instead of 3
-        if (now - this.lastTypingSent > 1500 && this.ws && this.ws.readyState === WebSocket.OPEN) {
+        // Send typing every 0.8 seconds instead of 1.5 for more real-time feel
+        if (now - this.lastTypingSent > 800 && this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.lastTypingSent = now;
             this.ws.send(JSON.stringify({
                 cmd: 'chat',
