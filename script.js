@@ -1210,11 +1210,24 @@ class RealtimeChat {
 
         // Highlights
         document.querySelectorAll('.onboarding-highlight').forEach(el => el.classList.remove('onboarding-highlight'));
+
+        // Reset sidebar if it was expanded for onboarding
+        if (this.onboardingSidebarExpanded) {
+            this.elements.sidebar.classList.remove('expanded');
+            this.onboardingSidebarExpanded = false;
+        }
+
         if (step.target) {
             const target = step.target === 'theme-section' ? document.querySelector('.theme-section') : this.elements[step.target];
             if (target) {
                 target.classList.add('onboarding-highlight');
                 target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // On mobile, auto-expand sidebar if it's the target
+                if (step.target === 'sidebar' && window.innerWidth <= 768) {
+                    this.elements.sidebar.classList.add('expanded');
+                    this.onboardingSidebarExpanded = true;
+                }
             }
         }
     }

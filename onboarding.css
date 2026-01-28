@@ -34,6 +34,8 @@
     transform: translateY(20px);
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     position: relative;
+    z-index: 10002;
+    /* Ensure it's above highlighted elements (10001) */
 }
 
 .onboarding-overlay.active .onboarding-card {
