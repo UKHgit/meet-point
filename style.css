@@ -180,6 +180,18 @@ body.theme-midnight {
     /* Prevent container-level scroll */
 }
 
+/* Hide mobile header on desktop (screens > 768px) */
+@media (min-width: 769px) {
+    .mobile-header {
+        display: none !important;
+    }
+    
+    .menu-toggle {
+        display: none !important;
+    }
+}
+}
+
 /* Desktop Header */
 .header {
     background: var(--bg-card);
@@ -1208,7 +1220,6 @@ body.theme-midnight {
     top: 0;
     z-index: 999;
     flex-shrink: 0;
-    /* Already added in late styles, but keeping consistent here */
 }
 
 .mobile-title {
