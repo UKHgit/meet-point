@@ -1617,9 +1617,6 @@ class RealtimeChat {
         const previewImg = document.getElementById('previewImage');
         const downloadBtn = document.getElementById('downloadImageBtn');
         const closeBtn = document.getElementById('closeImagePreview');
-        const zoomInBtn = document.getElementById('zoomInBtn');
-        const zoomOutBtn = document.getElementById('zoomOutBtn');
-        const zoomResetBtn = document.getElementById('zoomResetBtn');
 
         if (!modal || !previewImg) return;
 
@@ -1749,23 +1746,6 @@ class RealtimeChat {
             modal.style.display = 'none';
             resetZoom();
         };
-
-        // Zoom controls (for desktop)
-        zoomInBtn.onclick = () => {
-            currentScale = Math.min(currentScale + 0.3, 4);
-            updateTransform();
-        };
-
-        zoomOutBtn.onclick = () => {
-            currentScale = Math.max(currentScale - 0.3, 0.5);
-            if (currentScale <= 1) {
-                translateX = 0;
-                translateY = 0;
-            }
-            updateTransform();
-        };
-
-        zoomResetBtn.onclick = resetZoom;
 
         // Mouse wheel zoom (desktop)
         const imageContent = document.querySelector('.image-preview-content');
